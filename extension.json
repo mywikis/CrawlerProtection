@@ -1,0 +1,24 @@
+{
+    "name": "CrawlerProtection",
+    "author": "MyWikis LLC",
+    "version": "1.0.0",
+    "description": "Suite of protective measures to protect wikis from crawlers.",
+    "type": "hook",
+    "requires": {
+        "MediaWiki": ">= 1.35"
+    },
+    "AutoloadNamespaces": {
+        "MediaWiki\\Extension\\CrawlerProtection\\": "includes/"
+    },
+    "Hooks": {
+        "MediaWikiPerformAction": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onMediaWikiPerformAction"
+    },
+    "license-name": "MIT",
+    "Tests": {
+        "phpunit": "tests/phpunit"
+    },
+    "MessagesDirs": {
+        "CrawlerProtection": "i18n"
+    },
+    "manifest_version": 2
+}
