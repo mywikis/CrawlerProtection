@@ -2,6 +2,6 @@
     "@metadata": {
         "authors": [ "MyWikis LLC" ]
     },
-    "crawlerprotection-accessdenied-title": "Access Denied",
-    "crawlerprotection-accessdenied-text": "'''You must be logged in to view revisions.'''"
+    "crawlerprotection-accessdenied-title": "Access denied",
+    "crawlerprotection-accessdenied-text": "You must be logged in to perform this action or view this special page."
 }
