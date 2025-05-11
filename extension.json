@@ -11,7 +11,8 @@
         "MediaWiki\\Extension\\CrawlerProtection\\": "includes/"
     },
     "Hooks": {
-        "MediaWikiPerformAction": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onMediaWikiPerformAction"
+        "MediaWikiPerformAction": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onMediaWikiPerformAction",
+        "SpecialPageBeforeExecute": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onSpecialPageBeforeExecute"
     },
     "license-name": "MIT",
     "Tests": {
