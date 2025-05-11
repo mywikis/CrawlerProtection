@@ -8,17 +8,18 @@ use Title;
 use User;
 use WebRequest;
 use MediaWiki\MediaWiki;
+use MediaWiki\SpecialPage\SpecialPage;
+use RequestContext;
 
 class Hooks {
     /**
-     * Prevent viewing revisions, history, and Special:RecentChangesLinked by anonymous users.
+     * Block sensitive page views for anonymous users via MediaWikiPerformAction.
+     * Handles:
+     *  - ?type=revision
+     *  - ?action=history
      *
-     * @param OutputPage $output
-     * @param Article    $article
-     * @param Title      $title
-     * @param User       $user
-     * @param WebRequest $request
-     * @param MediaWiki  $wiki
+     * Special pages are handled separately in onSpecialPageBeforeExecute().
+     *
      * @return bool False to abort further action
      */
     public static function onMediaWikiPerformAction(
@@ -29,26 +30,49 @@ class Hooks {
         $request,
         $wiki
     ) {
-        // Block revision view, history action, and RecentChangesLinked for anonymous users
         $type   = $request->getVal( 'type' );
         $action = $request->getVal( 'action' );
 
-        if ( !$user->isRegistered()
-            && (
-                $type === 'revision'
-                || $action === 'history'
-                || $title->isSpecial( 'Recentchangeslinked' )
-            )
-        ) {
-            // Access denied message
-            $output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' )->text() );
-            $output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->text() );
-            $output->setStatusCode( 403 );
-
+        if ( !$user->isRegistered() && ( $type === 'revision' || $action === 'history' ) ) {
+            self::denyAccess( $output );
             return false;
         }
 
-        // Otherwise, allow normal processing
         return true;
+    }
+
+    /**
+     * Block Special:RecentChangesLinked and Special:WhatLinksHere for anonymous users.
+     *
+     * @param SpecialPage $specialPage
+     * @param string      $subPage
+     * @return bool False to abort execution
+     */
+    public static function onSpecialPageBeforeExecute( $specialPage, $subPage ) {
+        $user = $specialPage->getContext()->getUser();
+        if ( $user->isRegistered() ) {
+            return true; // logged‑in users: allow
+        }
+
+        $name = strtolower( $specialPage->getName() );
+        if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+            $out = $specialPage->getContext()->getOutput();
+            self::denyAccess( $out );
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Helper: output 403 Access Denied page using i18n messages.
+     *
+     * @param OutputPage $output
+     * @return void
+     */
+    private static function denyAccess( OutputPage $output ): void {
+        $output->setStatusCode( 403 );
+        $output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' )->text() );
+        $output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->text() );
     }
 }
