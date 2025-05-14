@@ -7,8 +7,8 @@ use Article;
 use Title;
 use User;
 use WebRequest;
-use MediaWiki\MediaWiki;
-use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki;
+use SpecialPage;
 use RequestContext;
 
 class Hooks {
