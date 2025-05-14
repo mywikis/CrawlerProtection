@@ -17,23 +17,41 @@ class Hooks {
      * Handles:
      *  - ?type=revision
      *  - ?action=history
+     *  - ?diff=1234
+     *  - ?oldid=1234
      *
-     * Special pages are handled separately in onSpecialPageBeforeExecute().
+     * Special pages (e.g. Special:WhatLinksHere) are handled separately.
      *
-     * @return bool False to abort further action
+     * @param OutputPage   $output
+     * @param Article      $article
+     * @param Title        $title
+     * @param User         $user
+     * @param WebRequest   $request
+     * @param MediaWiki    $wiki
+     * @return bool        False to abort further action
      */
     public static function onMediaWikiPerformAction(
-        $output,
-        $article,
-        $title,
-        $user,
-        $request,
-        $wiki
+        OutputPage $output,
+        Article $article,
+        Title $title,
+        User $user,
+        WebRequest $request,
+        MediaWiki $wiki
     ) {
         $type   = $request->getVal( 'type' );
         $action = $request->getVal( 'action' );
+        $diffId = (int)$request->getVal( 'diff' );
+        $oldId  = (int)$request->getVal( 'oldid' );
 
-        if ( !$user->isRegistered() && ( $type === 'revision' || $action === 'history' ) ) {
+        if (
+            !$user->isRegistered()
+            && (
+                $type === 'revision'
+                || $action === 'history'
+                || $diffId > 0
+                || $oldId  > 0
+            )
+        ) {
             self::denyAccess( $output );
             return false;
         }
@@ -46,12 +64,12 @@ class Hooks {
      *
      * @param SpecialPage $specialPage
      * @param string      $subPage
-     * @return bool False to abort execution
+     * @return bool       False to abort execution
      */
-    public static function onSpecialPageBeforeExecute( $specialPage, $subPage ) {
+    public static function onSpecialPageBeforeExecute( SpecialPage $specialPage, $subPage ) {
         $user = $specialPage->getContext()->getUser();
         if ( $user->isRegistered() ) {
-            return true; // logged‑in users: allow
+            return true; // logged-in users: allow
         }
 
         $name = strtolower( $specialPage->getName() );
