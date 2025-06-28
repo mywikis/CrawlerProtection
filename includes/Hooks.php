@@ -9,7 +9,6 @@ use User;
 use WebRequest;
 use MediaWiki;
 use SpecialPage;
-use RequestContext;
 
 class Hooks {
     /**
@@ -19,8 +18,6 @@ class Hooks {
      *  - ?action=history
      *  - ?diff=1234
      *  - ?oldid=1234
-     *
-     * Special pages (e.g. Special:WhatLinksHere) are handled separately.
      *
      * @param OutputPage   $output
      * @param Article      $article
@@ -43,8 +40,9 @@ class Hooks {
         $diffId = (int)$request->getVal( 'diff' );
         $oldId  = (int)$request->getVal( 'oldid' );
 
+        // For MW 1.31, use isAnon() instead of isRegistered()
         if (
-            !$user->isRegistered()
+            $user->isAnon()
             && (
                 $type === 'revision'
                 || $action === 'history'
@@ -68,8 +66,9 @@ class Hooks {
      */
     public static function onSpecialPageBeforeExecute( SpecialPage $specialPage, $subPage ) {
         $user = $specialPage->getContext()->getUser();
-        if ( $user->isRegistered() ) {
-            return true; // logged-in users: allow
+        // Allow only logged-in users
+        if ( ! $user->isAnon() ) {
+            return true;
         }
 
         $name = strtolower( $specialPage->getName() );
@@ -90,7 +89,10 @@ class Hooks {
      */
     private static function denyAccess( OutputPage $output ): void {
         $output->setStatusCode( 403 );
-        $output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' )->text() );
-        $output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->text() );
+        $output->setPageTitle(
+            wfMessage( 'crawlerprotection-accessdenied-title' )->text()
+        );
+        // MW 1.31 does not have addWikiTextAsInterface(); use addWikiMsg()
+        $output->addWikiMsg( 'crawlerprotection-accessdenied-text' );
     }
 }
