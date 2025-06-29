@@ -58,9 +58,6 @@ class HooksTest extends TestCase {
 	 */
 	public function testRevisionTypeBlocksAnonymous() {
 		$output = $this->createMock( self::$outputPageClassName );
-		$output->expects( $this->once() )->method( 'setPageTitle' );
-		$output->expects( $this->once() )->method( 'addWikiTextAsInterface' );
-		$output->expects( $this->once() )->method( 'setStatusCode' )->with( 403 );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
@@ -74,7 +71,11 @@ class HooksTest extends TestCase {
 		$title = $this->createMock( self::$titleClassName );
 		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
-		$runner = new Hooks();
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccess' );
+
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
 		$this->assertFalse( $result );
 	}
@@ -97,7 +98,11 @@ class HooksTest extends TestCase {
 		$title = $this->createMock( self::$titleClassName );
 		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
-		$runner = new Hooks();
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->never() )->method( 'denyAccess' );
+
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
 		$this->assertTrue( $result );
 	}
@@ -120,7 +125,11 @@ class HooksTest extends TestCase {
 		$title = $this->createMock( self::$titleClassName );
 		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
-		$runner = new Hooks();
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->never() )->method( 'denyAccess' );
+
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
 		$this->assertTrue( $result );
 	}

@@ -75,7 +75,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 				|| $oldId > 0
 			)
 		) {
-			self::denyAccess( $output );
+			$this->denyAccess( $output );
 			return false;
 		}
 
@@ -99,7 +99,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$name = strtolower( $special->getName() );
 		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
 			$out = $special->getContext()->getOutput();
-			self::denyAccess( $out );
+			$this->denyAccess( $out );
 			return false;
 		}
 
@@ -112,9 +112,15 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	private static function denyAccess( OutputPage $output ): void {
+	protected function denyAccess( OutputPage $output ): void {
 		$output->setStatusCode( 403 );
-		$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' )->text() );
-		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->text() );
+		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
+
+		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
+			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
+		} else {
+			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
+			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
+		}
 	}
 }
