@@ -2,37 +2,77 @@
 
 namespace MediaWiki\Extension\CrawlerProtection\Tests;
 
-use MediaWiki\Actions\ActionEntryPoint;
 use MediaWiki\Extension\CrawlerProtection\Hooks;
-use MediaWiki\Output\OutputPage;
-use MediaWiki\Page\Article;
-use MediaWiki\Title\Title;
 use PHPUnit\Framework\TestCase;
-use User;
-use WebRequest;
 
 /**
  * @coversDefaultClass \MediaWiki\Extension\CrawlerProtection\Hooks
  */
 class HooksTest extends TestCase {
+	/** @var string */
+	private static string $actionEntryPointClassName;
+
+	/** @var string */
+	private static string $articleClassName;
+
+	/** @var string */
+	private static string $outputPageClassName;
+
+	/** @var string */
+	private static string $titleClassName;
+
+	/** @var string */
+	private static string $userClassName;
+
+	/** @var string */
+	private static string $webRequestClassName;
+
+	public static function setUpBeforeClass(): void {
+		self::$actionEntryPointClassName = class_exists( '\MediaWiki\Actions\ActionEntryPoint' )
+			? '\MediaWiki\Actions\ActionEntryPoint'
+			: '\MediaWiki';
+
+		self::$articleClassName = class_exists( '\MediaWiki\Page\Article' )
+			? '\MediaWiki\Page\Article'
+			: '\Article';
+
+		self::$outputPageClassName = class_exists( '\MediaWiki\Output\OutputPage' )
+			? '\MediaWiki\Output\OutputPage'
+			: '\OutputPage';
+
+		self::$titleClassName = class_exists( '\MediaWiki\Title\Title' )
+			? '\MediaWiki\Title\Title'
+			: '\Title';
+
+		self::$userClassName = class_exists( '\MediaWiki\User\User' )
+			? '\MediaWiki\User\User'
+			: '\User';
+
+		self::$webRequestClassName = class_exists( '\MediaWiki\Request\WebRequest' )
+			? '\MediaWiki\Request\WebRequest'
+			: '\WebRequest';
+	}
+
 	/**
 	 * @covers ::onMediaWikiPerformAction
 	 */
 	public function testRevisionTypeBlocksAnonymous() {
-		$output = $this->createMock( OutputPage::class );
+		$output = $this->createMock( self::$outputPageClassName );
 		$output->expects( $this->once() )->method( 'setPageTitle' );
 		$output->expects( $this->once() )->method( 'addWikiTextAsInterface' );
 		$output->expects( $this->once() )->method( 'setStatusCode' )->with( 403 );
 
-		$request = $this->createMock( WebRequest::class );
-		$request->method( 'getVal' )->with( 'type' )->willReturn( 'revision' );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
 
-		$user = $this->createMock( User::class );
+		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
-		$article = $this->createMock( Article::class );
-		$title = $this->createMock( Title::class );
-		$wiki = $this->createMock( ActionEntryPoint::class );
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
 		$runner = new Hooks();
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
@@ -43,17 +83,19 @@ class HooksTest extends TestCase {
 	 * @covers ::onMediaWikiPerformAction
 	 */
 	public function testRevisionTypeAllowsLoggedIn() {
-		$output = $this->createMock( OutputPage::class );
+		$output = $this->createMock( self::$outputPageClassName );
 
-		$request = $this->createMock( WebRequest::class );
-		$request->method( 'getVal' )->with( 'type' )->willReturn( 'revision' );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
 
-		$user = $this->createMock( User::class );
+		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( true );
 
-		$article = $this->createMock( Article::class );
-		$title = $this->createMock( Title::class );
-		$wiki = $this->createMock( ActionEntryPoint::class );
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
 		$runner = new Hooks();
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
@@ -64,17 +106,19 @@ class HooksTest extends TestCase {
 	 * @covers ::onMediaWikiPerformAction
 	 */
 	public function testNonRevisionTypeAlwaysAllowed() {
-		$output = $this->createMock( OutputPage::class );
+		$output = $this->createMock( self::$outputPageClassName );
 
-		$request = $this->createMock( WebRequest::class );
-		$request->method( 'getVal' )->with( 'type' )->willReturn( 'view' );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'view' ],
+		] );
 
-		$user = $this->createMock( User::class );
+		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
-		$article = $this->createMock( Article::class );
-		$title = $this->createMock( Title::class );
-		$wiki = $this->createMock( ActionEntryPoint::class );
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
 
 		$runner = new Hooks();
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
