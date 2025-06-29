@@ -8,4 +8,8 @@ $cfg = require __DIR__ . '/../../../vendor/mediawiki/mediawiki-phan-config/src/c
 $cfg['suppress_issue_types'][] = 'UnusedSuppression';
 $cfg['suppress_issue_types'][] = 'UnusedPluginSuppression';
 
+// we make use of class aliases for backwards compat, but phan doesn't honor version checks surrounding them
+$cfg['suppress_issue_types'][] = 'PhanUndeclaredClassAliasOriginal';
+$cfg['suppress_issue_types'][] = 'PhanRedefineClassAlias';
+
 return $cfg;

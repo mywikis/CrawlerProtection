@@ -27,6 +27,5 @@
     "MessagesDirs": {
         "CrawlerProtection": "i18n"
     },
-	"callback": "MediaWiki\\Extension\\CrawlerProtection\\Setup::registerClassAliases",
     "manifest_version": 2
 }
