@@ -2,16 +2,17 @@
 
 namespace MediaWiki\Extension\CrawlerProtection;
 
-use OutputPage;
-use Article;
-use Title;
-use User;
-use WebRequest;
-use MediaWiki;
-use SpecialPage;
-use RequestContext;
+use MediaWiki\Actions\ActionEntryPoint;
+use MediaWiki\Hook\MediaWikiPerformActionHook;
+use MediaWiki\Output\OutputPage;
+use MediaWiki\Page\Article;
+use MediaWiki\Request\WebRequest;
+use MediaWiki\SpecialPage\Hook\SpecialPageBeforeExecuteHook;
+use MediaWiki\SpecialPage\SpecialPage;
+use MediaWiki\Title\Title;
+use MediaWiki\User\User;
 
-class Hooks {
+class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
     /**
      * Block sensitive page views for anonymous users via MediaWikiPerformAction.
      * Handles:
@@ -22,21 +23,21 @@ class Hooks {
      *
      * Special pages (e.g. Special:WhatLinksHere) are handled separately.
      *
-     * @param OutputPage   $output
-     * @param Article      $article
-     * @param Title        $title
-     * @param User         $user
-     * @param WebRequest   $request
-     * @param MediaWiki    $wiki
+     * @param OutputPage        $output
+     * @param Article           $article
+     * @param Title             $title
+     * @param User              $user
+     * @param WebRequest        $request
+     * @param ActionEntryPoint  $mediaWiki
      * @return bool        False to abort further action
      */
-    public static function onMediaWikiPerformAction(
-        OutputPage $output,
-        Article $article,
-        Title $title,
-        User $user,
-        WebRequest $request,
-        MediaWiki $wiki
+    public function onMediaWikiPerformAction(
+        $output,
+        $article,
+        $title,
+        $user,
+        $request,
+        $mediaWiki
     ) {
         $type   = $request->getVal( 'type' );
         $action = $request->getVal( 'action' );
@@ -62,19 +63,19 @@ class Hooks {
     /**
      * Block Special:RecentChangesLinked and Special:WhatLinksHere for anonymous users.
      *
-     * @param SpecialPage $specialPage
-     * @param string      $subPage
+     * @param SpecialPage $special
+     * @param string|null $subPage
      * @return bool       False to abort execution
      */
-    public static function onSpecialPageBeforeExecute( SpecialPage $specialPage, $subPage ) {
-        $user = $specialPage->getContext()->getUser();
+    public function onSpecialPageBeforeExecute( $special, $subPage ) {
+        $user = $special->getContext()->getUser();
         if ( $user->isRegistered() ) {
             return true; // logged-in users: allow
         }
 
-        $name = strtolower( $specialPage->getName() );
+        $name = strtolower( $special->getName() );
         if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
-            $out = $specialPage->getContext()->getOutput();
+            $out = $special->getContext()->getOutput();
             self::denyAccess( $out );
             return false;
         }
