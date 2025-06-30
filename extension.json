@@ -10,9 +10,15 @@
     "AutoloadNamespaces": {
         "MediaWiki\\Extension\\CrawlerProtection\\": "includes/"
     },
+	"HookHandlers": {
+		"main": {
+			"class": "MediaWiki\\Extension\\CrawlerProtection\\Hooks",
+			"services": []
+		}
+	},
     "Hooks": {
-        "MediaWikiPerformAction": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onMediaWikiPerformAction",
-        "SpecialPageBeforeExecute": "MediaWiki\\Extension\\CrawlerProtection\\Hooks::onSpecialPageBeforeExecute"
+        "MediaWikiPerformAction": "main",
+        "SpecialPageBeforeExecute": "main"
     },
     "license-name": "MIT",
     "Tests": {

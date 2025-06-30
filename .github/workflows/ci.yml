@@ -1,0 +1,151 @@
+name: Continuous Integration
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  EXTNAME: CrawlerProtection
+  MW_INSTALL_PATH: ${{ github.workspace }}
+
+jobs:
+  style:
+    name: Code Style
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+        php: [ '8.2', '8.3', '8.4' ]
+        mediawiki: [ REL1_43 ]
+        include:
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_35
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_39
+          - os: ubuntu-latest
+            php: '8.1'
+            mediawiki: REL1_39
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl
+          coverage: none
+          tools: composer
+      - name: Setup MediaWiki
+        uses: actions/checkout@v4
+        with:
+          repository: wikimedia/mediawiki
+          ref: ${{ matrix.mediawiki }}
+      - name: Setup Extension
+        uses: actions/checkout@v4
+        with:
+          path: extensions/${{ env.EXTNAME }}
+      - name: Setup Composer
+        run: |
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          composer update
+          composer update
+      - name: Lint
+        run: ./vendor/bin/parallel-lint --exclude node_modules --exclude vendor extensions/${{ env.EXTNAME }}
+      - name: PHP Code Sniffer
+        run: ./vendor/bin/phpcs -sp --standard=vendor/mediawiki/mediawiki-codesniffer/MediaWiki extensions/${{ env.EXTNAME }}
+
+  security:
+    name: Static Analysis
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+        # 1.43 phan is broken on php 8.4
+        php: [ '8.2', '8.3' ]
+        mediawiki: [ REL1_43 ]
+        include:
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_35
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_39
+          - os: ubuntu-latest
+            php: '8.1'
+            mediawiki: REL1_39
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl, ast
+          coverage: none
+          tools: composer
+      - name: Setup MediaWiki
+        uses: actions/checkout@v4
+        with:
+          repository: wikimedia/mediawiki
+          ref: ${{ matrix.mediawiki }}
+      - name: Setup Extension
+        uses: actions/checkout@v4
+        with:
+          path: extensions/${{ env.EXTNAME }}
+      - name: Setup Composer
+        run: |
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          composer update
+          composer update
+      - name: Phan
+        run: ./vendor/bin/phan -d extensions/${{ env.EXTNAME }} --minimum-target-php-version=7.4 --long-progress-bar
+  phpunit:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest ]
+        php: [ '8.2', '8.3', '8.4' ]
+        mediawiki: [ REL1_43 ]
+        include:
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_35
+          - os: ubuntu-latest
+            php: '7.4'
+            mediawiki: REL1_39
+          - os: ubuntu-latest
+            php: '8.2'
+            mediawiki: REL1_39
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl, ast
+          coverage: none
+          tools: composer
+      - name: Setup MediaWiki
+        uses: actions/checkout@v4
+        with:
+          repository: wikimedia/mediawiki
+          ref: ${{ matrix.mediawiki }}
+      - name: Setup Extension
+        uses: actions/checkout@v4
+        with:
+          path: extensions/${{ env.EXTNAME }}
+      - name: Setup Composer
+        run: |
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          composer update
+          composer update
+      - name: Install MediaWiki
+        run: php maintenance/install.php --dbtype=sqlite --with-extensions --pass=UnitTestingAdminPassword519 UnitTesting WikiAdmin
+      - name: Phpunit
+        run: ./vendor/bin/phpunit -- extensions/${{ env.EXTNAME }}/tests/phpunit
