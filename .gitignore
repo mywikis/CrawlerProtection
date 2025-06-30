@@ -1,0 +1,152 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.env
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS specific files
+.DS_Store
+Thumbs.db
+*.bak
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Project specific
+data/
+output/
+*.pkl
+*.pickle
+*.model
+*.h5
+*.weights
+
+# PHP
+*.php~
+*.php.swp
+*.php.swo
+
+# Composer
+vendor/
+composer.phar
+composer.lock
+
+# PHP error logs
+php_errors.log
+php_error.log
+error_log
+access_log
+
+# PHP sessions
+sess_*
+
+# PHP uploads
+uploads/
+upload/
+
+# PHPUnit
+.phpunit.result.cache
+phpunit.xml
+.phpunit.cache/
+
+# PHP CS Fixer
+.php_cs
+.php_cs.cache
+.php-cs-fixer.cache
+
+# PHP CodeSniffer
+phpcs.xml
+.phpcs-cache
+
+# PHPStan
+phpstan.neon
+phpstan-baseline.neon

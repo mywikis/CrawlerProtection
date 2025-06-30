@@ -83,7 +83,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
-	 * Block Special:RecentChangesLinked and Special:WhatLinksHere for anonymous users.
+	 * Block Special:RecentChangesLinked, Special:WhatLinksHere, and Special:MobileDiff for anonymous users.
 	 *
 	 * @param SpecialPage $special
 	 * @param string|null $subPage
@@ -97,7 +97,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		}
 
 		$name = strtolower( $special->getName() );
-		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ], true ) ) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
 			return false;
