@@ -26,6 +26,7 @@ if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
 
 use MediaWiki\Actions\ActionEntryPoint;
 use MediaWiki\Hook\MediaWikiPerformActionHook;
+use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
@@ -35,6 +36,22 @@ use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
+
+	private $protectWhatLinksHere;
+	private $protectRecentChangesLinked;
+	private $protectHistory;
+	private $protectDiff;
+	private $protectRevision;
+
+	function __construct() {
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+        $this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
+		$this->protectRecentChangesLinked = $config->get('CrawlerProtectRecentChangesLinked');
+		$this->protectHistory = $config->get('CrawlerProtectHistory');
+		$this->protectDiff = $config->get('CrawlerProtectDiff');
+		$this->protectRevision = $config->get('CrawlerProtectRevision');
+    }
+
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
 	 * Handles:
@@ -69,10 +86,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		if (
 			!$user->isRegistered()
 			&& (
-				$type === 'revision'
-				|| $action === 'history'
-				|| $diffId > 0
-				|| $oldId > 0
+				($type === 'revision' && $this->protectRevision)
+				|| ($action === 'history' && $this->protectHistory)
+				|| ($diffId > 0 && $this->protectDiff)
+				|| ($oldId > 0 && $this->protectHistory)
 			)
 		) {
 			$this->denyAccess( $output );
@@ -97,7 +114,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		}
 
 		$name = strtolower( $special->getName() );
-		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+		if (
+			($this->protectRecentChangesLinked && $name == 'recentchangeslinked')
+			||($this->protectWhatLinksHere && $name == 'whatlinkshere')
+		) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
 			return false;
