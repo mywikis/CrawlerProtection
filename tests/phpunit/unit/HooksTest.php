@@ -133,4 +133,21 @@ class HooksTest extends TestCase {
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
 		$this->assertTrue( $result );
 	}
+
+	/**
+	 * @covers ::denyAccess
+	 */
+	public function testDenyAccessSetsCorrectStatusAndContent() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$output->expects( $this->once() )->method( 'clearHTML' );
+		$output->expects( $this->once() )->method( 'setStatusCode' )->with( 403 );
+		$output->expects( $this->once() )->method( 'addWikiTextAsInterface' );
+		$output->expects( $this->once() )->method( 'returnToMain' );
+
+		$hooks = new Hooks();
+		$reflection = new \ReflectionClass( $hooks );
+		$method = $reflection->getMethod( 'denyAccess' );
+		$method->setAccessible( true );
+		$method->invoke( $hooks, $output );
+	}
 }
