@@ -113,14 +113,17 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @return void
 	 */
 	protected function denyAccess( OutputPage $output ): void {
+		$output->clearHTML();
 		$output->setStatusCode( 403 );
-		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
-
+		
 		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
 			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
 		} else {
 			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
 			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
 		}
+		
+		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
+		$output->returnToMain();
 	}
 }

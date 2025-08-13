@@ -3,5 +3,5 @@
         "authors": [ "MyWikis LLC" ]
     },
     "crawlerprotection-accessdenied-title": "Access denied",
-    "crawlerprotection-accessdenied-text": "You must be logged in to perform this action or view this special page."
+    "crawlerprotection-accessdenied-text": "You must be logged in to perform this action or view this special page. Please [[Special:UserLogin|log in]] to continue."
 }
