@@ -50,7 +50,12 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$this->protectHistory = $config->get('CrawlerProtectHistory');
 		$this->protectDiff = $config->get('CrawlerProtectDiff');
 		$this->protectRevision = $config->get('CrawlerProtectRevision');
-    }
+		$this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
+		$this->protectRecentChangesLinked = $config->get('CrawlerProtectRecentChangesLinked');
+		$this->protectHistory = $config->get('CrawlerProtectHistory');
+		$this->protectDiff = $config->get('CrawlerProtectDiff');
+		$this->protectRevision = $config->get('CrawlerProtectRevision');
+	}
 
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
