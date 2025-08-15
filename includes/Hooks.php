@@ -116,7 +116,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$name = strtolower( $special->getName() );
 		if (
 			($this->protectRecentChangesLinked && $name == 'recentchangeslinked')
-			||($this->protectWhatLinksHere && $name == 'whatlinkshere')
+			|| ($this->protectWhatLinksHere && $name == 'whatlinkshere')
 		) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
