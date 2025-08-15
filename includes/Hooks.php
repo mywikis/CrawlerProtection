@@ -45,7 +45,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 	function __construct() {
 		$config = MediaWikiServices::getInstance()->getMainConfig();
-        $this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
+		$this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
 		$this->protectRecentChangesLinked = $config->get('CrawlerProtectRecentChangesLinked');
 		$this->protectHistory = $config->get('CrawlerProtectHistory');
 		$this->protectDiff = $config->get('CrawlerProtectDiff');
