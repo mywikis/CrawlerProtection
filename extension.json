@@ -27,5 +27,27 @@
     "MessagesDirs": {
         "CrawlerProtection": "i18n"
     },
-    "manifest_version": 2
+    "manifest_version": 2,
+    "config": {
+        "CrawlerProtectWhatLinksHere": {
+            "value": true,
+            "description": "If true (default), protects Special:WhatLinksHere from anonymous users."
+        },
+        "CrawlerProtectRecentChangesLinked": {
+            "value": true,
+            "description": "If true (default), protects Special:RecentChangesLinked from anonymous users."
+        },
+        "CrawlerProtectHistory": {
+            "value": true,
+            "description": "If true (default), protects the history from anonymous users."
+        },
+        "CrawlerProtectDiff": {
+            "value": true,
+            "description": "If true (default), protects diffs from anonymous users."
+        },
+        "CrawlerProtectRevision": {
+            "value": true,
+            "description": "If true (default), protects revisions from anonymous users."
+        }
+    }
 }
