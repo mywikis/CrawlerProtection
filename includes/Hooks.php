@@ -45,16 +45,15 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 	function __construct() {
 		$config = MediaWikiServices::getInstance()->getMainConfig();
-		$this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
-		$this->protectRecentChangesLinked = $config->get('CrawlerProtectRecentChangesLinked');
-		$this->protectHistory = $config->get('CrawlerProtectHistory');
-		$this->protectDiff = $config->get('CrawlerProtectDiff');
-		$this->protectRevision = $config->get('CrawlerProtectRevision');
-		$this->protectWhatLinksHere = $config->get('CrawlerProtectWhatLinksHere');
-		$this->protectRecentChangesLinked = $config->get('CrawlerProtectRecentChangesLinked');
-		$this->protectHistory = $config->get('CrawlerProtectHistory');
-		$this->protectDiff = $config->get('CrawlerProtectDiff');
-		$this->protectRevision = $config->get('CrawlerProtectRevision');
+		$this->protectWhatLinksHere = $config->get( 'CrawlerProtectWhatLinksHere' );
+		$this->protectRecentChangesLinked = $config->get( 'CrawlerProtectRecentChangesLinked' );
+		$this->protectHistory = $config->get( 'CrawlerProtectHistory' );
+		$this->protectDiff = $config->get( 'CrawlerProtectDiff' );
+		$this->protectRevision = $config->get( 'CrawlerProtectRevision' );
+		$this->protectRecentChangesLinked = $config->get( 'CrawlerProtectRecentChangesLinked' );
+		$this->protectHistory = $config->get( 'CrawlerProtectHistory' );
+		$this->protectDiff = $config->get( 'CrawlerProtectDiff' );
+		$this->protectRevision = $config->get( 'CrawlerProtectRevision' );
 	}
 
 	/**
@@ -91,10 +90,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		if (
 			!$user->isRegistered()
 			&& (
-				($type === 'revision' && $this->protectRevision)
-				|| ($action === 'history' && $this->protectHistory)
-				|| ($diffId > 0 && $this->protectDiff)
-				|| ($oldId > 0 && $this->protectHistory)
+				( $type === 'revision' && $this->protectRevision )
+				|| ( $action === 'history' && $this->protectHistory )
+				|| ( $diffId > 0 && $this->protectDiff )
+				|| ( $oldId > 0 && $this->protectHistory )
 			)
 		) {
 			$this->denyAccess( $output );
@@ -120,8 +119,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$name = strtolower( $special->getName() );
 		if (
-			($this->protectRecentChangesLinked && $name == 'recentchangeslinked')
-			|| ($this->protectWhatLinksHere && $name == 'whatlinkshere')
+			( $this->protectRecentChangesLinked && $name === 'recentchangeslinked' )
+			|| ( $this->protectWhatLinksHere && $name === 'whatlinkshere' )
 		) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
