@@ -84,6 +84,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 	/**
 	 * Block Special:RecentChangesLinked and Special:WhatLinksHere for anonymous users.
+	 * Also blocks any special page access with ?oldid parameter.
 	 *
 	 * @param SpecialPage $special
 	 * @param string|null $subPage
@@ -98,6 +99,15 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$name = strtolower( $special->getName() );
 		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+			$out = $special->getContext()->getOutput();
+			$this->denyAccess( $out );
+			return false;
+		}
+
+		// Also block if oldid parameter is present
+		$request = $special->getContext()->getRequest();
+		$oldId = (int)$request->getVal( 'oldid' );
+		if ( $oldId > 0 ) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
 			return false;
