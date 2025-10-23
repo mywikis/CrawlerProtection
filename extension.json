@@ -20,6 +20,17 @@
         "MediaWikiPerformAction": "main",
         "SpecialPageBeforeExecute": "main"
     },
+	"config": {
+		"CrawlerProtectedSpecialPages": {
+			"value": [
+				"recentchangeslinked",
+				"whatlinkshere"
+			]
+		},
+		"CrawlerProtectionDenyFast": {
+			"value": false
+		}
+	},
     "license-name": "MIT",
     "Tests": {
         "phpunit": "tests/phpunit"
