@@ -123,6 +123,11 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		return true;
 	}
 
+	/**
+	 * Helper: output 418 Access Denied page using i18n messages and die
+	 *
+	 * @return never
+	 */
 	protected function denyAccessFast(): void {
 		header( 'HTTP/1.0 418 Forbidden' );
 		die( 'I am a teapot' );
