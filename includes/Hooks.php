@@ -110,7 +110,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			// allow forgiving entries in the setting array for Special pages names
 			in_array( $special->getName(), $protectedSpecialPages, true )
 			|| in_array( $name, $protectedSpecialPages, true )
-			|| in_array( 'Special:' . $name, $protectedSpecialPages, true )
+			|| in_array( 'Special:' . $special->getName(), $protectedSpecialPages, true )
 		) {
 			$out = $special->getContext()->getOutput();
 			if ( $denyFast ) {
@@ -124,7 +124,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
-	 * Helper: output 418 Access Denied page using i18n messages and die
+	 * Helper: output 418 Teapot and halt the processing immediately
 	 *
 	 * @return never
 	 */
