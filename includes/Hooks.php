@@ -99,11 +99,11 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$protectedSpecialPages = MediaWikiServices::getInstance()
 			->getMainConfig()
-			->get('CrawlerProtectedSpecialPages');
+			->get( 'CrawlerProtectedSpecialPages' );
 
 		$denyFast = MediaWikiServices::getInstance()
 			->getMainConfig()
-			->get('CrawlerProtectedSpecialPages');
+			->get( 'CrawlerProtectedSpecialPages' );
 
 		$name = strtolower( $special->getName() );
 		if (
@@ -124,7 +124,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	protected function denyAccessFast(): void {
-		header( 'HTTP/1.0 418 Forbidden');
+		header( 'HTTP/1.0 418 Forbidden' );
 		die( 'I am a teapot' );
 	}
 
