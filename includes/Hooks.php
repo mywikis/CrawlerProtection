@@ -123,6 +123,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * Helper: output 418 Teapot and halt the processing immediately
 	 *
 	 * @return void
+	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessFast() {
 		header( 'HTTP/1.0 418 Forbidden' );
