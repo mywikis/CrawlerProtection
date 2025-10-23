@@ -26,6 +26,7 @@ if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
 
 use MediaWiki\Actions\ActionEntryPoint;
 use MediaWiki\Hook\MediaWikiPerformActionHook;
+use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
@@ -96,14 +97,35 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			return true;
 		}
 
+		$protectedSpecialPages = MediaWikiServices::getInstance()
+			->getMainConfig()
+			->get('CrawlerProtectedSpecialPages');
+
+		$denyFast = MediaWikiServices::getInstance()
+			->getMainConfig()
+			->get('CrawlerProtectedSpecialPages');
+
 		$name = strtolower( $special->getName() );
-		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+		if (
+			// allow forgiving entries in the setting array for Special pages names
+			in_array( $special->getName(), $protectedSpecialPages, true )
+			|| in_array( $name, $protectedSpecialPages, true )
+			|| in_array( 'Special:' . $name, $protectedSpecialPages, true )
+		) {
 			$out = $special->getContext()->getOutput();
+			if ( $denyFast ) {
+				$this->denyAccessFast();
+			}
 			$this->denyAccess( $out );
 			return false;
 		}
 
 		return true;
+	}
+
+	protected function denyAccessFast(): void {
+		header( 'HTTP/1.0 418 Forbidden');
+		die( 'I am a teapot' );
 	}
 
 	/**
