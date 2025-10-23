@@ -124,7 +124,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 *
 	 * @return void
 	 */
-	protected function denyAccessFast(): void {
+	protected function denyAccessFast() {
 		header( 'HTTP/1.0 418 Forbidden' );
 		die( 'I am a teapot' );
 	}
