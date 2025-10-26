@@ -1,3 +1,7 @@
+---
+applyTo: "**/*.php"
+---
+
 # PHP Coding Conventions
 
 This page describes the coding conventions used within files of the MediaWiki codebase written in PHP.
