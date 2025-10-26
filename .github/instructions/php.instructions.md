@@ -275,6 +275,7 @@ Example:
 private static string $nameOfVariable = '';
 ```
 
+
 ### Type declarations in function parameters
 
 Use native type declarations and return type declarations when applicable. (But see #Don't add type declarations for "big" legacy classes below.)
