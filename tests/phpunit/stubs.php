@@ -10,7 +10,7 @@ if ( !defined( 'MW_VERSION' ) ) {
 // Stub function for wfMessage - only define if not already defined
 if ( !function_exists( 'wfMessage' ) ) {
 	function wfMessage( $key ) {
-		return new class {
+		return new class() {
 			public function plain() {
 				return 'Mock message';
 			}

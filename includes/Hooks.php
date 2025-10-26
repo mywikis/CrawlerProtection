@@ -61,10 +61,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$request,
 		$mediaWiki
 	) {
-		$type   = $request->getVal( 'type' );
+		$type = $request->getVal( 'type' );
 		$action = $request->getVal( 'action' );
 		$diffId = (int)$request->getVal( 'diff' );
-		$oldId  = (int)$request->getVal( 'oldid' );
+		$oldId = (int)$request->getVal( 'oldid' );
 
 		if (
 			!$user->isRegistered()
