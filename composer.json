@@ -5,15 +5,15 @@
     "autoload": {
         "psr-4": {
             "MediaWiki\\Extension\\CrawlerProtection\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/"
         },
         "files": [
             "tests/phpunit/stubs.php",
             "tests/phpunit/namespaced-stubs.php"
         ]
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/"
-        }
     }
 }
