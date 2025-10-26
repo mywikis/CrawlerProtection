@@ -266,6 +266,16 @@ See Manual:Coding conventions#Indenting and alignment.
 
 For anonymous functions, prefer arrow functions when the anonymous function consists only of one line. Arrow functions are more concise and readable than regular anonymous functions and neatly side-steps formatting issues that arise with single-line anonymous functions.
 
+### Type declarations for variables
+Avoid using PHPDoc comments to declare types for local variables. Instead, use native type declarations for function parameters and return types, and use static analysis tools (like PHPStan or Psalm) to infer types of local variables.
+
+Example:
+
+```php
+private static string $nameOfVariable = '';
+```
+
+
 ### Type declarations in function parameters
 
 Use native type declarations and return type declarations when applicable. (But see #Don't add type declarations for "big" legacy classes below.)

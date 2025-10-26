@@ -19,6 +19,9 @@ class HooksTest extends TestCase {
 	private static string $outputPageClassName;
 
 	/** @var string */
+	private static string $specialPageClassName;
+
+	/** @var string */
 	private static string $titleClassName;
 
 	/** @var string */
@@ -39,6 +42,10 @@ class HooksTest extends TestCase {
 		self::$outputPageClassName = class_exists( '\MediaWiki\Output\OutputPage' )
 			? '\MediaWiki\Output\OutputPage'
 			: '\OutputPage';
+
+		self::$specialPageClassName = class_exists( '\MediaWiki\SpecialPage\SpecialPage' )
+			? '\MediaWiki\SpecialPage\SpecialPage'
+			: '\SpecialPage';
 
 		self::$titleClassName = class_exists( '\MediaWiki\Title\Title' )
 			? '\MediaWiki\Title\Title'
@@ -132,5 +139,140 @@ class HooksTest extends TestCase {
 
 		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
 		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 * @dataProvider provideBlockedSpecialPages
+	 * @param string $specialPageName
+	 */
+	public function testSpecialPageBlocksAnonymous( $specialPageName ) {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$context = $this->createMockContext( $user, $output );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( $specialPageName );
+		$special->method( 'getContext' )->willReturn( $context );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$result = $runner->onSpecialPageBeforeExecute( $special, null );
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 * @dataProvider provideBlockedSpecialPages
+	 * @param string $specialPageName
+	 */
+	public function testSpecialPageAllowsLoggedIn( $specialPageName ) {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$context = $this->createMockContext( $user, $output );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( $specialPageName );
+		$special->method( 'getContext' )->willReturn( $context );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->never() )->method( 'denyAccess' );
+
+		$result = $runner->onSpecialPageBeforeExecute( $special, null );
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 */
+	public function testUnblockedSpecialPageAllowsAnonymous() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$context = $this->createMockContext( $user, $output );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( 'Search' );
+		$special->method( 'getContext' )->willReturn( $context );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->never() )->method( 'denyAccess' );
+
+		$result = $runner->onSpecialPageBeforeExecute( $special, null );
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * Create a mock context object.
+	 *
+	 * @param object $user Mock user object
+	 * @param object $output Mock output object
+	 * @return object Mock context
+	 */
+	private function createMockContext( $user, $output ) {
+		$context = new class( $user, $output ) {
+			/** @var object */
+			private $user;
+			/** @var object */
+			private $output;
+
+			/**
+			 * @param object $user
+			 * @param object $output
+			 */
+			public function __construct( $user, $output ) {
+				$this->user = $user;
+				$this->output = $output;
+			}
+
+			/**
+			 * @return object
+			 */
+			public function getUser() {
+				return $this->user;
+			}
+
+			/**
+			 * @return object
+			 */
+			public function getOutput() {
+				return $this->output;
+			}
+		};
+		return $context;
+	}
+
+	/**
+	 * Data provider for blocked special pages.
+	 *
+	 * @return array
+	 */
+	public function provideBlockedSpecialPages() {
+		return [
+			'RecentChangesLinked' => [ 'RecentChangesLinked' ],
+			'WhatLinksHere' => [ 'WhatLinksHere' ],
+			'MobileDiff' => [ 'MobileDiff' ],
+			// Test case sensitivity
+			'RecentChangesLinked lowercase' => [ 'recentchangeslinked' ],
+			'WhatLinksHere lowercase' => [ 'whatlinkshere' ],
+			'MobileDiff lowercase' => [ 'mobilediff' ],
+			// Test mixed case
+			'MobileDiff mixed case' => [ 'MoBiLeDiFf' ],
+		];
 	}
 }

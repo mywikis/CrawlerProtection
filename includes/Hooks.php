@@ -61,10 +61,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$request,
 		$mediaWiki
 	) {
-		$type   = $request->getVal( 'type' );
+		$type = $request->getVal( 'type' );
 		$action = $request->getVal( 'action' );
 		$diffId = (int)$request->getVal( 'diff' );
-		$oldId  = (int)$request->getVal( 'oldid' );
+		$oldId = (int)$request->getVal( 'oldid' );
 
 		if (
 			!$user->isRegistered()
@@ -83,7 +83,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
-	 * Block Special:RecentChangesLinked and Special:WhatLinksHere for anonymous users.
+	 * Block Special:RecentChangesLinked, Special:WhatLinksHere, and Special:MobileDiff for anonymous users.
 	 *
 	 * @param SpecialPage $special
 	 * @param string|null $subPage
@@ -97,7 +97,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		}
 
 		$name = strtolower( $special->getName() );
-		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere' ], true ) ) {
+		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ], true ) ) {
 			$out = $special->getContext()->getOutput();
 			$this->denyAccess( $out );
 			return false;
@@ -112,7 +112,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	protected function denyAccess( OutputPage $output ): void {
+	protected function denyAccess( $output ): void {
 		$output->setStatusCode( 403 );
 		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
 
