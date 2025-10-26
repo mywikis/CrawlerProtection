@@ -112,7 +112,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	protected function denyAccess( OutputPage $output ): void {
+	protected function denyAccess( $output ): void {
 		$output->setStatusCode( 403 );
 		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
 

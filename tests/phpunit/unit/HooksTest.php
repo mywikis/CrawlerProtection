@@ -144,6 +144,7 @@ class HooksTest extends TestCase {
     /**
      * @covers ::onSpecialPageBeforeExecute
      * @dataProvider provideBlockedSpecialPages
+     * @param string $specialPageName
      */
     public function testSpecialPageBlocksAnonymous( $specialPageName ) {
         $output = $this->createMock( self::$outputPageClassName );
@@ -151,23 +152,7 @@ class HooksTest extends TestCase {
         $user = $this->createMock( self::$userClassName );
         $user->method( 'isRegistered' )->willReturn( false );
 
-        $context = new class( $user, $output ) {
-            private $user;
-            private $output;
-
-            public function __construct( $user, $output ) {
-                $this->user = $user;
-                $this->output = $output;
-            }
-
-            public function getUser() {
-                return $this->user;
-            }
-
-            public function getOutput() {
-                return $this->output;
-            }
-        };
+        $context = $this->createMockContext( $user, $output );
 
         $special = $this->createMock( self::$specialPageClassName );
         $special->method( 'getName' )->willReturn( $specialPageName );
@@ -185,6 +170,7 @@ class HooksTest extends TestCase {
     /**
      * @covers ::onSpecialPageBeforeExecute
      * @dataProvider provideBlockedSpecialPages
+     * @param string $specialPageName
      */
     public function testSpecialPageAllowsLoggedIn( $specialPageName ) {
         $output = $this->createMock( self::$outputPageClassName );
@@ -192,23 +178,7 @@ class HooksTest extends TestCase {
         $user = $this->createMock( self::$userClassName );
         $user->method( 'isRegistered' )->willReturn( true );
 
-        $context = new class( $user, $output ) {
-            private $user;
-            private $output;
-
-            public function __construct( $user, $output ) {
-                $this->user = $user;
-                $this->output = $output;
-            }
-
-            public function getUser() {
-                return $this->user;
-            }
-
-            public function getOutput() {
-                return $this->output;
-            }
-        };
+        $context = $this->createMockContext( $user, $output );
 
         $special = $this->createMock( self::$specialPageClassName );
         $special->method( 'getName' )->willReturn( $specialPageName );
@@ -232,23 +202,7 @@ class HooksTest extends TestCase {
         $user = $this->createMock( self::$userClassName );
         $user->method( 'isRegistered' )->willReturn( false );
 
-        $context = new class( $user, $output ) {
-            private $user;
-            private $output;
-
-            public function __construct( $user, $output ) {
-                $this->user = $user;
-                $this->output = $output;
-            }
-
-            public function getUser() {
-                return $this->user;
-            }
-
-            public function getOutput() {
-                return $this->output;
-            }
-        };
+        $context = $this->createMockContext( $user, $output );
 
         $special = $this->createMock( self::$specialPageClassName );
         $special->method( 'getName' )->willReturn( 'Search' );
@@ -264,7 +218,49 @@ class HooksTest extends TestCase {
     }
 
     /**
-     * Data provider for blocked special pages
+     * Create a mock context object.
+     *
+     * @param object $user Mock user object
+     * @param object $output Mock output object
+     * @return object Mock context
+     */
+    private function createMockContext( $user, $output ) {
+        $context = new class( $user, $output ) {
+            /** @var object */
+            private $user;
+            /** @var object */
+            private $output;
+
+            /**
+             * @param object $user
+             * @param object $output
+             */
+            public function __construct( $user, $output ) {
+                $this->user = $user;
+                $this->output = $output;
+            }
+
+            /**
+             * @return object
+             */
+            public function getUser() {
+                return $this->user;
+            }
+
+            /**
+             * @return object
+             */
+            public function getOutput() {
+                return $this->output;
+            }
+        };
+        return $context;
+    }
+
+    /**
+     * Data provider for blocked special pages.
+     *
+     * @return array
      */
     public function provideBlockedSpecialPages() {
         return [
