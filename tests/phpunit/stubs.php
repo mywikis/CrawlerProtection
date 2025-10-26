@@ -8,8 +8,8 @@ if ( !defined('MW_VERSION') ) {
 }
 
 // Stub function for wfMessage
-if (!function_exists('wfMessage')) {
-    function wfMessage($key) {
+if ( !function_exists( 'wfMessage' ) ) {
+    function wfMessage( $key ) {
         return new class {
             public function plain() { return 'Mock message'; }
         };
