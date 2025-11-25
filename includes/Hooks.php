@@ -99,7 +99,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$config = MediaWikiServices::getInstance()->getMainConfig();
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$denyFast = $config->get( 'CrawlerProtectionDenyFast' );
+		$denyFast = $config->get( 'CrawlerProtectionUse418' );
 
 		$name = strtolower( $special->getName() );
 		if (
@@ -110,7 +110,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		) {
 			$out = $special->getContext()->getOutput();
 			if ( $denyFast ) {
-				$this->denyAccessFast();
+				$this->denyAccessWith418();
 			}
 			$this->denyAccess( $out );
 			return false;
@@ -125,7 +125,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @return void
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
-	protected function denyAccessFast() {
+	protected function denyAccessWith418() {
 		header( 'HTTP/1.0 418 Forbidden' );
 		die( 'I am a teapot' );
 	}
