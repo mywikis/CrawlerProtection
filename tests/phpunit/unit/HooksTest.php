@@ -159,7 +159,7 @@ class HooksTest extends TestCase {
 		$special->method( 'getContext' )->willReturn( $context );
 
 		$runner = $this->getMockBuilder( Hooks::class )
-			->onlyMethods( [ 'denyAccess' ] )
+			->onlyMethods( [ 'denyAccess', 'denyAccessWith418' ] )
 			->getMock();
 		$runner->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
@@ -255,6 +255,32 @@ class HooksTest extends TestCase {
 			}
 		};
 		return $context;
+	}
+
+	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 * @covers ::denyAccessWith418
+	 */
+	public function testSpecialPageCallsDenyAccessWith418WhenConfigured() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$context = $this->createMockContext( $user, $output );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( 'WhatLinksHere' );
+		$special->method( 'getContext' )->willReturn( $context );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess', 'denyAccessWith418' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccessWith418' );
+		$runner->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$result = $runner->onSpecialPageBeforeExecute( $special, null );
+		$this->assertFalse( $result );
 	}
 
 	/**

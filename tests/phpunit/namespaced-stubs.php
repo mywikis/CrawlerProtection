@@ -68,3 +68,55 @@ namespace MediaWiki\Actions {
 	class ActionEntryPoint {
 	}
 }
+
+namespace MediaWiki {
+	class MediaWikiServices {
+		/** @var MediaWikiServices|null */
+		private static $instance = null;
+
+		/**
+		 * @return MediaWikiServices
+		 */
+		public static function getInstance() {
+			if ( self::$instance === null ) {
+				self::$instance = new self();
+			}
+			return self::$instance;
+		}
+
+		/**
+		 * @param MediaWikiServices|null $instance
+		 */
+		public static function setInstance( $instance ) {
+			self::$instance = $instance;
+		}
+
+		/**
+		 * @return \Config
+		 */
+		public function getMainConfig() {
+			return new class() {
+				/**
+				 * @param string $name
+				 * @return mixed
+				 */
+				public function get( $name ) {
+					if ( $name === 'CrawlerProtectedSpecialPages' ) {
+						return [
+							'RecentChangesLinked',
+							'WhatLinksHere',
+							'MobileDiff',
+							'recentchangeslinked',
+							'whatlinkshere',
+							'mobilediff'
+						];
+					}
+					if ( $name === 'CrawlerProtectionUse418' ) {
+						return true;
+					}
+					return null;
+				}
+			};
+		}
+	}
+}
