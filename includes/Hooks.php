@@ -103,13 +103,16 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
 		$denyFast = $config->get( 'CrawlerProtectionUse418' );
 
+		// Normalize protected special pages: lowercase and strip 'Special:' prefix
+		$normalizedProtectedPages = array_map(
+			fn( $p ) => ( $p = strtolower( $p ) ) && strpos( $p, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0
+				? substr( $p, 8 )
+				: $p,
+			$protectedSpecialPages
+		);
+
 		$name = strtolower( $special->getName() );
-		if (
-			// allow forgiving entries in the setting array for Special pages names
-			in_array( $special->getName(), $protectedSpecialPages, true )
-			|| in_array( $name, $protectedSpecialPages, true )
-			|| in_array( self::SPECIAL_PAGE_PREFIX . $special->getName(), $protectedSpecialPages, true )
-		) {
+		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
 			$out = $special->getContext()->getOutput();
 			if ( $denyFast ) {
 				$this->denyAccessWith418();
