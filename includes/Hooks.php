@@ -131,8 +131,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessWith418() {
-		header( 'HTTP/1.0 418 Forbidden' );
-		die( 'I am a teapot' );
+		header( 'HTTP/1.0 I\'m a teapot' );
+		die( 'I\'m a teapot' );
 	}
 
 	/**
