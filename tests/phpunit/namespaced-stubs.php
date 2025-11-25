@@ -92,6 +92,15 @@ namespace MediaWiki {
 		}
 
 		/**
+		 * Reset the singleton instance for testing
+		 *
+		 * @return void
+		 */
+		public static function resetForTesting() {
+			self::$instance = null;
+		}
+
+		/**
 		 * @return \Config
 		 */
 		public function getMainConfig() {

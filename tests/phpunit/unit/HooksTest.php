@@ -61,6 +61,16 @@ class HooksTest extends TestCase {
 	}
 
 	/**
+	 * Reset MediaWikiServices singleton after each test to prevent test pollution
+	 *
+	 * @return void
+	 */
+	protected function tearDown(): void {
+		parent::tearDown();
+		\MediaWiki\MediaWikiServices::resetForTesting();
+	}
+
+	/**
 	 * @covers ::onMediaWikiPerformAction
 	 */
 	public function testRevisionTypeBlocksAnonymous() {
