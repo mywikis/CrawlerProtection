@@ -10,28 +10,28 @@
     "AutoloadNamespaces": {
         "MediaWiki\\Extension\\CrawlerProtection\\": "includes/"
     },
-	"HookHandlers": {
-		"main": {
-			"class": "MediaWiki\\Extension\\CrawlerProtection\\Hooks",
-			"services": []
-		}
-	},
+    "HookHandlers": {
+        "main": {
+            "class": "MediaWiki\\Extension\\CrawlerProtection\\Hooks",
+            "services": []
+        }
+    },
     "Hooks": {
         "MediaWikiPerformAction": "main",
         "SpecialPageBeforeExecute": "main"
     },
-	"config": {
-		"CrawlerProtectedSpecialPages": {
-			"value": [
-				"mobilediff",
-				"recentchangeslinked",
-				"whatlinkshere"
-			]
-		},
-		"CrawlerProtectionUse418": {
-			"value": false
-		}
-	},
+    "config": {
+        "CrawlerProtectedSpecialPages": {
+            "value": [
+                "mobilediff",
+                "recentchangeslinked",
+                "whatlinkshere"
+            ]
+        },
+        "CrawlerProtectionUse418": {
+            "value": false
+        }
+    },
     "license-name": "MIT",
     "Tests": {
         "phpunit": "tests/phpunit"
