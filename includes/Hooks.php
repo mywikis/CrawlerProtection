@@ -36,6 +36,8 @@ use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
+	/** @var string Prefix for special page names */
+	private const SPECIAL_PAGE_PREFIX = 'Special:';
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
 	 * Handles:
@@ -106,7 +108,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			// allow forgiving entries in the setting array for Special pages names
 			in_array( $special->getName(), $protectedSpecialPages, true )
 			|| in_array( $name, $protectedSpecialPages, true )
-			|| in_array( 'Special:' . $special->getName(), $protectedSpecialPages, true )
+			|| in_array( self::SPECIAL_PAGE_PREFIX . $special->getName(), $protectedSpecialPages, true )
 		) {
 			$out = $special->getContext()->getOutput();
 			if ( $denyFast ) {
