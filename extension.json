@@ -23,6 +23,7 @@
 	"config": {
 		"CrawlerProtectedSpecialPages": {
 			"value": [
+				"mobilediff",
 				"recentchangeslinked",
 				"whatlinkshere"
 			]
