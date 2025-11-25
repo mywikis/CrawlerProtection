@@ -99,7 +99,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$config = MediaWikiServices::getInstance()->getMainConfig();
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$denyFast = $config->get( 'CrawlerProtectedSpecialPages' );
+		$denyFast = $config->get( 'CrawlerProtectionDenyFast' );
 
 		$name = strtolower( $special->getName() );
 		if (
