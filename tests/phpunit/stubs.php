@@ -9,8 +9,19 @@ if ( !defined( 'MW_VERSION' ) ) {
 
 // Stub function for wfMessage - only define if not already defined
 if ( !function_exists( 'wfMessage' ) ) {
+	/**
+	 * Stub for MediaWiki's wfMessage function
+	 *
+	 * @param string $key Message key
+	 * @return object Mock message object
+	 */
 	function wfMessage( $key ) {
 		return new class() {
+			/**
+			 * Return plain text version of message
+			 *
+			 * @return string
+			 */
 			public function plain() {
 				return 'Mock message';
 			}
