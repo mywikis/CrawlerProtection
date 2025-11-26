@@ -18,10 +18,13 @@ namespace MediaWiki\Output {
 	class OutputPage {
 		public function setStatusCode( $code ) {
 		}
+
 		public function addWikiTextAsInterface( $text ) {
 		}
+
 		public function setPageTitle( $title ) {
 		}
+
 		public function setPageTitleMsg( $msg ) {
 		}
 	}
@@ -32,6 +35,7 @@ namespace MediaWiki\SpecialPage {
 		public function getName() {
 			return '';
 		}
+
 		public function getContext() {
 			return null;
 		}

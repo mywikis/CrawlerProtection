@@ -38,6 +38,7 @@ use MediaWiki\User\User;
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
 	/** @var string Prefix for special page names */
 	private const SPECIAL_PAGE_PREFIX = 'Special:';
+
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
 	 * Handles:
@@ -105,7 +106,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
-			fn( $p ) => ( $p = strtolower( $p ) ) && strpos( $p, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0
+			fn ( $p ) => ( $p = strtolower( $p ) ) && strpos( $p, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0
 				? substr( $p, 8 )
 				: $p,
 			$protectedSpecialPages
