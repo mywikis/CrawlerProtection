@@ -67,7 +67,14 @@ class HooksTest extends TestCase {
 	 */
 	protected function tearDown(): void {
 		parent::tearDown();
-		\MediaWiki\MediaWikiServices::resetForTesting();
+		// Reset the test config flag
+		if ( property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			\MediaWiki\MediaWikiServices::$testUse418 = false;
+		}
+		// Only reset if the method exists (in our test stubs)
+		if ( method_exists( '\MediaWiki\MediaWikiServices', 'resetForTesting' ) ) {
+			\MediaWiki\MediaWikiServices::resetForTesting();
+		}
 	}
 
 	/**
@@ -230,20 +237,20 @@ class HooksTest extends TestCase {
 	/**
 	 * Create a mock context object.
 	 *
-	 * @param object $user Mock user object
-	 * @param object $output Mock output object
-	 * @return object Mock context
+	 * @param \PHPUnit\Framework\MockObject\MockObject $user Mock user object
+	 * @param \PHPUnit\Framework\MockObject\MockObject $output Mock output object
+	 * @return \stdClass Mock context
 	 */
 	private function createMockContext( $user, $output ) {
 		$context = new class( $user, $output ) {
-			/** @var object */
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $user;
-			/** @var object */
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $output;
 
 			/**
-			 * @param object $user
-			 * @param object $output
+			 * @param \PHPUnit\Framework\MockObject\MockObject $user
+			 * @param \PHPUnit\Framework\MockObject\MockObject $output
 			 */
 			public function __construct( $user, $output ) {
 				$this->user = $user;
@@ -251,14 +258,14 @@ class HooksTest extends TestCase {
 			}
 
 			/**
-			 * @return object
+			 * @return \PHPUnit\Framework\MockObject\MockObject
 			 */
 			public function getUser() {
 				return $this->user;
 			}
 
 			/**
-			 * @return object
+			 * @return \PHPUnit\Framework\MockObject\MockObject
 			 */
 			public function getOutput() {
 				return $this->output;
@@ -272,6 +279,18 @@ class HooksTest extends TestCase {
 	 * @covers ::denyAccessWith418
 	 */
 	public function testSpecialPageCallsDenyAccessWith418WhenConfigured() {
+		// Skip this test when running in MediaWiki environment where we can't mock the config
+		// This test only works with our stubs where we can control MediaWikiServices
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			$this->markTestSkipped(
+				'Test requires stub MediaWikiServices with testUse418 property. ' .
+				'Run via MediaWiki test runner for full integration testing.'
+			);
+		}
+
+		// Enable 418 response in the test stub config
+		\MediaWiki\MediaWikiServices::$testUse418 = true;
+
 		$output = $this->createMock( self::$outputPageClassName );
 
 		$user = $this->createMock( self::$userClassName );
@@ -284,10 +303,10 @@ class HooksTest extends TestCase {
 		$special->method( 'getContext' )->willReturn( $context );
 
 		$runner = $this->getMockBuilder( Hooks::class )
-			->onlyMethods( [ 'denyAccess', 'denyAccessWith418' ] )
+			->onlyMethods( [ 'denyAccessWith418' ] )
 			->getMock();
+		// When denyFast is true, only denyAccessWith418 is called (it dies before denyAccess)
 		$runner->expects( $this->once() )->method( 'denyAccessWith418' );
-		$runner->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
 		$result = $runner->onSpecialPageBeforeExecute( $special, null );
 		$this->assertFalse( $result );

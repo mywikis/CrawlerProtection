@@ -73,10 +73,23 @@ namespace MediaWiki\Actions {
 	}
 }
 
+namespace MediaWiki\Config {
+	interface Config {
+		/**
+		 * @param string $name
+		 * @return mixed
+		 */
+		public function get( $name );
+	}
+}
+
 namespace MediaWiki {
 	class MediaWikiServices {
 		/** @var MediaWikiServices|null */
 		private static $instance = null;
+
+		/** @var bool Control CrawlerProtectionUse418 config for testing */
+		public static $testUse418 = false;
 
 		/**
 		 * @return MediaWikiServices
@@ -105,10 +118,10 @@ namespace MediaWiki {
 		}
 
 		/**
-		 * @return \Config
+		 * @return \MediaWiki\Config\Config
 		 */
 		public function getMainConfig() {
-			return new class() {
+			return new class() implements \MediaWiki\Config\Config {
 				/**
 				 * @param string $name
 				 * @return mixed
@@ -125,7 +138,7 @@ namespace MediaWiki {
 						];
 					}
 					if ( $name === 'CrawlerProtectionUse418' ) {
-						return true;
+						return MediaWikiServices::$testUse418;
 					}
 					return null;
 				}
