@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable Squiz.Classes.ClassFileName.NoMatch
 
 // Basic stubs for MediaWiki testing
 
@@ -13,7 +15,7 @@ if ( !function_exists( 'wfMessage' ) ) {
 	 * Stub for MediaWiki's wfMessage function
 	 *
 	 * @param string $key Message key
-	 * @return object Mock message object
+	 * @return \stdClass Mock message object
 	 */
 	function wfMessage( $key ) {
 		return new class() {

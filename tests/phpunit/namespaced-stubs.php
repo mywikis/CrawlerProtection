@@ -1,4 +1,6 @@
 <?php
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable Squiz.Classes.ClassFileName.NoMatch
 
 // Hook interfaces
 namespace MediaWiki\Hook {

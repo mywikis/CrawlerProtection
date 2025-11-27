@@ -15,9 +15,6 @@
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 	<exclude-pattern>*.phan/*</exclude-pattern>
-	<!-- test stub files intentionally have multiple classes in one file -->
-	<exclude-pattern>*/tests/phpunit/stubs.php</exclude-pattern>
-	<exclude-pattern>*/tests/phpunit/namespaced-stubs.php</exclude-pattern>
 
 	<!-- Show progress -->
 	<arg name="colors"/>

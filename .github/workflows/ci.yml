@@ -59,7 +59,9 @@ jobs:
       - name: Lint
         run: ./vendor/bin/parallel-lint --exclude node_modules --exclude vendor extensions/${{ env.EXTNAME }}
       - name: PHP Code Sniffer
-        run: ./vendor/bin/phpcs -sp --standard=vendor/mediawiki/mediawiki-codesniffer/MediaWiki extensions/${{ env.EXTNAME }}
+	    # pick up our .phpcs.xml automatically
+		# note: must manually sniff exclusions in .phpcs.xml
+        run: cd extensions/${{ env.EXTNAME }} && ../../vendor/bin/phpcs -sp
 
   security:
     name: Static Analysis
