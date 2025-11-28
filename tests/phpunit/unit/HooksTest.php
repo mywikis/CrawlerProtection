@@ -33,17 +33,6 @@ class HooksTest extends TestCase {
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
 
-		// Set up configuration for MediaWiki PHPUnit environment
-		if ( defined( 'MW_PHPUNIT_TEST' ) ) {
-			global $wgCrawlerProtectedSpecialPages, $wgCrawlerProtectionUse418;
-			$wgCrawlerProtectedSpecialPages = [
-				'RecentChangesLinked',
-				'WhatLinksHere',
-				'MobileDiff',
-			];
-			$wgCrawlerProtectionUse418 = false;
-		}
-
 		self::$actionEntryPointClassName = class_exists( '\MediaWiki\Actions\ActionEntryPoint' )
 			? '\MediaWiki\Actions\ActionEntryPoint'
 			: '\MediaWiki';
@@ -87,22 +76,6 @@ class HooksTest extends TestCase {
 		// Only reset if the method exists (in our test stubs)
 		if ( method_exists( '\MediaWiki\MediaWikiServices', 'resetForTesting' ) ) {
 			\MediaWiki\MediaWikiServices::resetForTesting();
-		}
-	}
-
-	/**
-	 * Clean up global configuration after all tests
-	 *
-	 * @return void
-	 */
-	public static function tearDownAfterClass(): void {
-		parent::tearDownAfterClass();
-
-		// Clean up global config
-		if ( defined( 'MW_PHPUNIT_TEST' ) ) {
-			global $wgCrawlerProtectedSpecialPages, $wgCrawlerProtectionUse418;
-			unset( $wgCrawlerProtectedSpecialPages );
-			unset( $wgCrawlerProtectionUse418 );
 		}
 	}
 
