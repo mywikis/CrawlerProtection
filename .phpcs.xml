@@ -2,7 +2,7 @@
 <ruleset name="CrawlerProtection">
 	<description>MediaWiki coding standards for CrawlerProtection extension</description>
 
-	<rule ref="./vendor/mediawiki/mediawiki-codesniffer/MediaWiki">
+	<rule ref="../../vendor/mediawiki/mediawiki-codesniffer/MediaWiki">
 		<exclude name="MediaWiki.Commenting.FunctionComment.MissingDocumentationProtected" />
 		<exclude name="MediaWiki.Commenting.FunctionComment.MissingDocumentationPublic" />
 	</rule>

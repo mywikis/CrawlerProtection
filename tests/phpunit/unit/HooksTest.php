@@ -308,19 +308,15 @@ class HooksTest extends TestCase {
 	 * @covers ::denyAccessWith418
 	 */
 	public function testSpecialPageCallsDenyAccessWith418WhenConfigured() {
-		// Enable 418 response in config
-		if ( property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
-			// Using test stubs
-			\MediaWiki\MediaWikiServices::$testUse418 = true;
-		} elseif ( defined( 'MW_PHPUNIT_TEST' ) ) {
-			// Using MediaWiki test environment
-			global $wgCrawlerProtectionUse418;
-			$wgCrawlerProtectionUse418 = true;
-		} else {
+		// This test only works with our test stubs, not in MediaWiki's PHPUnit environment
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
 			$this->markTestSkipped(
-				'Test requires either stub MediaWikiServices or MediaWiki test environment.'
+				'Test requires stub MediaWikiServices. Skipped in MediaWiki integration tests.'
 			);
 		}
+
+		// Enable 418 response in the test stub config
+		\MediaWiki\MediaWikiServices::$testUse418 = true;
 
 		$output = $this->createMock( self::$outputPageClassName );
 
