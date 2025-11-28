@@ -31,6 +31,19 @@ class HooksTest extends TestCase {
 	private static string $webRequestClassName;
 
 	public static function setUpBeforeClass(): void {
+		parent::setUpBeforeClass();
+
+		// Set up configuration for MediaWiki PHPUnit environment
+		if ( defined( 'MW_PHPUNIT_TEST' ) ) {
+			global $wgCrawlerProtectedSpecialPages, $wgCrawlerProtectionUse418;
+			$wgCrawlerProtectedSpecialPages = [
+				'RecentChangesLinked',
+				'WhatLinksHere',
+				'MobileDiff',
+			];
+			$wgCrawlerProtectionUse418 = false;
+		}
+
 		self::$actionEntryPointClassName = class_exists( '\MediaWiki\Actions\ActionEntryPoint' )
 			? '\MediaWiki\Actions\ActionEntryPoint'
 			: '\MediaWiki';
@@ -74,6 +87,22 @@ class HooksTest extends TestCase {
 		// Only reset if the method exists (in our test stubs)
 		if ( method_exists( '\MediaWiki\MediaWikiServices', 'resetForTesting' ) ) {
 			\MediaWiki\MediaWikiServices::resetForTesting();
+		}
+	}
+
+	/**
+	 * Clean up global configuration after all tests
+	 *
+	 * @return void
+	 */
+	public static function tearDownAfterClass(): void {
+		parent::tearDownAfterClass();
+
+		// Clean up global config
+		if ( defined( 'MW_PHPUNIT_TEST' ) ) {
+			global $wgCrawlerProtectedSpecialPages, $wgCrawlerProtectionUse418;
+			unset( $wgCrawlerProtectedSpecialPages );
+			unset( $wgCrawlerProtectionUse418 );
 		}
 	}
 
@@ -279,17 +308,19 @@ class HooksTest extends TestCase {
 	 * @covers ::denyAccessWith418
 	 */
 	public function testSpecialPageCallsDenyAccessWith418WhenConfigured() {
-		// Skip this test when running in MediaWiki environment where we can't mock the config
-		// This test only works with our stubs where we can control MediaWikiServices
-		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+		// Enable 418 response in config
+		if ( property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			// Using test stubs
+			\MediaWiki\MediaWikiServices::$testUse418 = true;
+		} elseif ( defined( 'MW_PHPUNIT_TEST' ) ) {
+			// Using MediaWiki test environment
+			global $wgCrawlerProtectionUse418;
+			$wgCrawlerProtectionUse418 = true;
+		} else {
 			$this->markTestSkipped(
-				'Test requires stub MediaWikiServices with testUse418 property. ' .
-				'Run via MediaWiki test runner for full integration testing.'
+				'Test requires either stub MediaWikiServices or MediaWiki test environment.'
 			);
 		}
-
-		// Enable 418 response in the test stub config
-		\MediaWiki\MediaWikiServices::$testUse418 = true;
 
 		$output = $this->createMock( self::$outputPageClassName );
 
