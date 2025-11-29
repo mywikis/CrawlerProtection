@@ -26,6 +26,7 @@ if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
 
 use MediaWiki\Actions\ActionEntryPoint;
 use MediaWiki\Hook\MediaWikiPerformActionHook;
+use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
@@ -35,6 +36,9 @@ use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
+	/** @var string Prefix for special page names */
+	private const SPECIAL_PAGE_PREFIX = 'Special:';
+
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
 	 * Handles:
@@ -96,14 +100,40 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			return true;
 		}
 
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
+		$denyFast = $config->get( 'CrawlerProtectionUse418' );
+
+		// Normalize protected special pages: lowercase and strip 'Special:' prefix
+		$normalizedProtectedPages = array_map(
+			fn ( $p ) => ( $p = strtolower( $p ) ) && strpos( $p, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0
+				? substr( $p, 8 )
+				: $p,
+			$protectedSpecialPages
+		);
+
 		$name = strtolower( $special->getName() );
-		if ( in_array( $name, [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ], true ) ) {
+		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
 			$out = $special->getContext()->getOutput();
+			if ( $denyFast ) {
+				$this->denyAccessWith418();
+			}
 			$this->denyAccess( $out );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Helper: output 418 Teapot and halt the processing immediately
+	 *
+	 * @return void
+	 * @suppress PhanPluginNeverReturnMethod
+	 */
+	protected function denyAccessWith418() {
+		header( 'HTTP/1.0 I\'m a teapot' );
+		die( 'I\'m a teapot' );
 	}
 
 	/**

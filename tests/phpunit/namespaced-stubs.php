@@ -1,4 +1,7 @@
 <?php
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable Squiz.Classes.ClassFileName.NoMatch
+// phpcs:disable MediaWiki.Files.ClassMatchesFilename.NotMatch
 
 // Hook interfaces
 namespace MediaWiki\Hook {
@@ -18,10 +21,13 @@ namespace MediaWiki\Output {
 	class OutputPage {
 		public function setStatusCode( $code ) {
 		}
+
 		public function addWikiTextAsInterface( $text ) {
 		}
+
 		public function setPageTitle( $title ) {
 		}
+
 		public function setPageTitleMsg( $msg ) {
 		}
 	}
@@ -32,6 +38,7 @@ namespace MediaWiki\SpecialPage {
 		public function getName() {
 			return '';
 		}
+
 		public function getContext() {
 			return null;
 		}
@@ -66,5 +73,79 @@ namespace MediaWiki\Page {
 
 namespace MediaWiki\Actions {
 	class ActionEntryPoint {
+	}
+}
+
+namespace MediaWiki\Config {
+	interface Config {
+		/**
+		 * @param string $name
+		 * @return mixed
+		 */
+		public function get( $name );
+	}
+}
+
+namespace MediaWiki {
+	class MediaWikiServices {
+		/** @var MediaWikiServices|null */
+		private static $instance = null;
+
+		/** @var bool Control CrawlerProtectionUse418 config for testing */
+		public static $testUse418 = false;
+
+		/**
+		 * @return MediaWikiServices
+		 */
+		public static function getInstance() {
+			if ( self::$instance === null ) {
+				self::$instance = new self();
+			}
+			return self::$instance;
+		}
+
+		/**
+		 * @param MediaWikiServices|null $instance
+		 */
+		public static function setInstance( $instance ) {
+			self::$instance = $instance;
+		}
+
+		/**
+		 * Reset the singleton instance for testing
+		 *
+		 * @return void
+		 */
+		public static function resetForTesting() {
+			self::$instance = null;
+		}
+
+		/**
+		 * @return \MediaWiki\Config\Config
+		 */
+		public function getMainConfig() {
+			return new class() implements \MediaWiki\Config\Config {
+				/**
+				 * @param string $name
+				 * @return mixed
+				 */
+				public function get( $name ) {
+					if ( $name === 'CrawlerProtectedSpecialPages' ) {
+						return [
+							'RecentChangesLinked',
+							'WhatLinksHere',
+							'MobileDiff',
+							'recentchangeslinked',
+							'whatlinkshere',
+							'mobilediff'
+						];
+					}
+					if ( $name === 'CrawlerProtectionUse418' ) {
+						return MediaWikiServices::$testUse418;
+					}
+					return null;
+				}
+			};
+		}
 	}
 }

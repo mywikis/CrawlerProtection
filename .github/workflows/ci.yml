@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - specialPageList  # Add your development branch
   pull_request:
 
 env:
@@ -58,7 +59,7 @@ jobs:
       - name: Lint
         run: ./vendor/bin/parallel-lint --exclude node_modules --exclude vendor extensions/${{ env.EXTNAME }}
       - name: PHP Code Sniffer
-        run: ./vendor/bin/phpcs -sp --standard=vendor/mediawiki/mediawiki-codesniffer/MediaWiki extensions/${{ env.EXTNAME }}
+        run: cd extensions/${{ env.EXTNAME }} && ../../vendor/bin/phpcs -sp
 
   security:
     name: Static Analysis
