@@ -63,6 +63,25 @@ class HooksTest extends TestCase {
 	}
 
 	/**
+	 * Set up test configuration before each test
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void {
+		parent::setUp();
+		// In MediaWiki test environment, set the required globals
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			// We're in real MediaWiki, set up the globals
+			$GLOBALS['wgCrawlerProtectedSpecialPages'] = [
+				'RecentChangesLinked',
+				'WhatLinksHere',
+				'MobileDiff',
+			];
+			$GLOBALS['wgCrawlerProtectionUse418'] = false;
+		}
+	}
+
+	/**
 	 * Reset MediaWikiServices singleton after each test to prevent test pollution
 	 *
 	 * @return void
@@ -76,6 +95,11 @@ class HooksTest extends TestCase {
 		// Only reset if the method exists (in our test stubs)
 		if ( method_exists( '\MediaWiki\MediaWikiServices', 'resetForTesting' ) ) {
 			\MediaWiki\MediaWikiServices::resetForTesting();
+		}
+		// Clean up globals if we set them
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			unset( $GLOBALS['wgCrawlerProtectedSpecialPages'] );
+			unset( $GLOBALS['wgCrawlerProtectionUse418'] );
 		}
 	}
 
