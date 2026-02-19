@@ -130,6 +130,9 @@ namespace MediaWiki {
 				 * @return mixed
 				 */
 				public function get( $name ) {
+					if ( $name === 'CrawlerProtectedActions' ) {
+						return [ 'history' ];
+					}
 					if ( $name === 'CrawlerProtectedSpecialPages' ) {
 						return [
 							'RecentChangesLinked',

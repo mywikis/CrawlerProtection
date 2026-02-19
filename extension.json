@@ -21,6 +21,11 @@
         "SpecialPageBeforeExecute": "main"
     },
     "config": {
+        "CrawlerProtectedActions": {
+            "value": [
+                "history"
+            ]
+        },
         "CrawlerProtectedSpecialPages": {
             "value": [
                 "mobilediff",

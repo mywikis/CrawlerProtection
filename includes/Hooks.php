@@ -43,7 +43,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
 	 * Handles:
 	 *  - ?type=revision
-	 *  - ?action=history
+	 *  - ?action=<configurable actions>
 	 *  - ?diff=1234
 	 *  - ?oldid=1234
 	 *
@@ -70,11 +70,14 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$diffId = (int)$request->getVal( 'diff' );
 		$oldId = (int)$request->getVal( 'oldid' );
 
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+		$protectedActions = $config->get( 'CrawlerProtectedActions' );
+
 		if (
 			!$user->isRegistered()
 			&& (
 				$type === 'revision'
-				|| $action === 'history'
+				|| in_array( $action, $protectedActions, true )
 				|| $diffId > 0
 				|| $oldId > 0
 			)

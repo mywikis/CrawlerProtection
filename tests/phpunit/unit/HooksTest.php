@@ -161,6 +161,128 @@ class HooksTest extends TestCase {
 	}
 
 	/**
+	 * @covers ::onMediaWikiPerformAction
+	 */
+	public function testHistoryActionBlocksAnonymous() {
+		// Skip this test in MediaWiki environment - it requires service container
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			$this->markTestSkipped(
+				'Test requires stub MediaWikiServices. Skipped in MediaWiki unit test environment.'
+			);
+		}
+
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'action', null, 'history' ],
+		] );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccess' );
+
+		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @covers ::onMediaWikiPerformAction
+	 */
+	public function testHistoryActionAllowsLoggedIn() {
+		// Skip this test in MediaWiki environment - it requires service container
+		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
+			$this->markTestSkipped(
+				'Test requires stub MediaWikiServices. Skipped in MediaWiki unit test environment.'
+			);
+		}
+
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'action', null, 'history' ],
+		] );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->never() )->method( 'denyAccess' );
+
+		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::onMediaWikiPerformAction
+	 */
+	public function testDiffParameterBlocksAnonymous() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'diff', null, '1234' ],
+		] );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccess' );
+
+		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @covers ::onMediaWikiPerformAction
+	 */
+	public function testOldidParameterBlocksAnonymous() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'oldid', null, '5678' ],
+		] );
+
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$article = $this->createMock( self::$articleClassName );
+		$title = $this->createMock( self::$titleClassName );
+		$wiki = $this->createMock( self::$actionEntryPointClassName );
+
+		$runner = $this->getMockBuilder( Hooks::class )
+			->onlyMethods( [ 'denyAccess' ] )
+			->getMock();
+		$runner->expects( $this->once() )->method( 'denyAccess' );
+
+		$result = $runner->onMediaWikiPerformAction( $output, $article, $title, $user, $request, $wiki );
+		$this->assertFalse( $result );
+	}
+
+	/**
 	 * @covers ::onSpecialPageBeforeExecute
 	 * @dataProvider provideBlockedSpecialPages
 	 * @param string $specialPageName
