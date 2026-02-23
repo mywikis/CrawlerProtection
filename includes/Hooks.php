@@ -102,7 +102,6 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$config = MediaWikiServices::getInstance()->getMainConfig();
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$denyFast = $config->get( 'CrawlerProtectionUse418' );
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
@@ -114,11 +113,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$name = strtolower( $special->getName() );
 		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
-			$out = $special->getContext()->getOutput();
-			if ( $denyFast ) {
-				$this->denyAccessWith418();
-			}
-			$this->denyAccess( $out );
+			$this->denyAccess();
 			return false;
 		}
 
@@ -126,31 +121,13 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
-	 * Helper: output 418 Teapot and halt the processing immediately
-	 *
-	 * @return void
-	 * @suppress PhanPluginNeverReturnMethod
-	 */
-	protected function denyAccessWith418() {
-		header( 'HTTP/1.0 I\'m a teapot' );
-		die( 'I\'m a teapot' );
-	}
-
-	/**
-	 * Helper: output 403 Access Denied page using i18n messages.
+	 * Output 403 Access Denied page in as lightweight a way as possible.
 	 *
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	protected function denyAccess( $output ): void {
-		$output->setStatusCode( 403 );
-		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
-
-		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
-			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		} else {
-			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
-			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		}
+	protected function denyAccess(): void {
+		header( 'HTTP/1.1 403 Forbidden' );
+		die( "You must be logged in to perform this action or view this special page." );
 	}
 }
