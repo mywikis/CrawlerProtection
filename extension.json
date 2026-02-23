@@ -27,9 +27,6 @@
                 "recentchangeslinked",
                 "whatlinkshere"
             ]
-        },
-        "CrawlerProtectionUse418": {
-            "value": false
         }
     },
     "license-name": "MIT",
