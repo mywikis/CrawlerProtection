@@ -28,10 +28,10 @@
                 "whatlinkshere"
             ]
         },
-        "CrawlerProtectionCustomDenialHeader": {
+        "CrawlerProtectionDenialHeader": {
             "value": null
         },
-        "CrawlerProtectionCustomDenialText": {
+        "CrawlerProtectionDenialText": {
             "value": null
         }
     },
