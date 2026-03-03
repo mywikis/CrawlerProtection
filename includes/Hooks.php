@@ -102,7 +102,9 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$config = MediaWikiServices::getInstance()->getMainConfig();
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$denyFast = $config->get( 'CrawlerProtectionUse418' );
+		$customDenialHeader = $config->get( 'CrawlerProtectionCustomDenialHeader' );
+		$customDenialText = $config->get( 'CrawlerProtectionCustomDenialText' );
+		$denyFast = $customDenialHeader !== null && $customDenialText !== null;
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
@@ -116,7 +118,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
 			$out = $special->getContext()->getOutput();
 			if ( $denyFast ) {
-				$this->denyAccessWith418();
+				$this->denyAccessCustom( $customDenialHeader, $customDenialText );
 			}
 			$this->denyAccess( $out );
 			return false;
@@ -126,14 +128,14 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
-	 * Helper: output 418 Teapot and halt the processing immediately
+	 * Display custom text for the "access denied" message, to avoid unnecessarily taxing resources.
 	 *
 	 * @return void
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
-	protected function denyAccessWith418() {
-		header( 'HTTP/1.0 I\'m a teapot' );
-		die( 'I\'m a teapot' );
+	protected function denyAccessCustom( $customDenialHeader, $customDenialText ) {
+		header( htmlspecialchars( $customDenialHeader ) );
+		die( htmlspecialchars( $customDenialText ) );
 	}
 
 	/**
