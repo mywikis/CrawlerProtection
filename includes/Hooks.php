@@ -102,8 +102,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$config = MediaWikiServices::getInstance()->getMainConfig();
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$customDenialHeader = $config->get( 'CrawlerProtectionCustomDenialHeader' );
-		$customDenialText = $config->get( 'CrawlerProtectionCustomDenialText' );
+		$customDenialHeader = $config->get( 'CrawlerProtectionDenialHeader' );
+		$customDenialText = $config->get( 'CrawlerProtectionDenialText' );
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
