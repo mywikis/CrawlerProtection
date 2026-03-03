@@ -28,8 +28,11 @@
                 "whatlinkshere"
             ]
         },
-        "CrawlerProtectionUse418": {
-            "value": false
+        "CrawlerProtectionCustomDenialHeader": {
+            "value": null
+        },
+        "CrawlerProtectionCustomDenialText": {
+            "value": null
         }
     },
     "license-name": "MIT",
