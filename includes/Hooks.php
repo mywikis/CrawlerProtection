@@ -104,7 +104,6 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
 		$customDenialHeader = $config->get( 'CrawlerProtectionCustomDenialHeader' );
 		$customDenialText = $config->get( 'CrawlerProtectionCustomDenialText' );
-		$denyFast = $customDenialHeader !== null && $customDenialText !== null;
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
@@ -117,7 +116,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$name = strtolower( $special->getName() );
 		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
 			$out = $special->getContext()->getOutput();
-			if ( $denyFast ) {
+			if (  $customDenialHeader !== null && $customDenialText !== null ) {
 				$this->denyAccessCustom( $customDenialHeader, $customDenialText );
 			}
 			$this->denyAccess( $out );
