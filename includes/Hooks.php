@@ -104,6 +104,11 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
 		$customDenialHeader = $config->get( 'CrawlerProtectionDenialHeader' );
 		$customDenialText = $config->get( 'CrawlerProtectionDenialText' );
+		$use418 = $config->get( 'CrawlerProtectionUse418' );
+		if (  $customDenialHeader === null && $customDenialText === null && $use418 ) {
+			$customDenialHeader = 'HTTP/1.0 I\'m a teapot';
+			$customDenialText = 'I\'m a teapot';
+		}
 
 		// Normalize protected special pages: lowercase and strip 'Special:' prefix
 		$normalizedProtectedPages = array_map(
