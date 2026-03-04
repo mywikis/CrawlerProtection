@@ -28,6 +28,9 @@
                 "whatlinkshere"
             ]
         },
+        "CrawlerProtectionUse418": {
+            "value": false
+        },
         "CrawlerProtectionDenialHeader": {
             "value": null
         },
