@@ -138,7 +138,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessCustom( $customDenialHeader, $customDenialText ) {
-		header( htmlspecialchars( $customDenialHeader ) );
+		header( $customDenialHeader );
 		die( htmlspecialchars( $customDenialText ) );
 	}
 
