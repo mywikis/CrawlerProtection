@@ -185,7 +185,7 @@ class HooksTest extends TestCase {
 		$special->method( 'getContext' )->willReturn( $context );
 
 		$runner = $this->getMockBuilder( Hooks::class )
-			->onlyMethods( [ 'denyAccess', 'denyAccessWith418' ] )
+			->onlyMethods( [ 'denyAccess', 'denyAccessCustom' ] )
 			->getMock();
 		$runner->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
@@ -299,9 +299,9 @@ class HooksTest extends TestCase {
 
 	/**
 	 * @covers ::onSpecialPageBeforeExecute
-	 * @covers ::denyAccessWith418
+	 * @covers ::denyAccessCustom
 	 */
-	public function testSpecialPageCallsDenyAccessWith418WhenConfigured() {
+	public function testSpecialPageCallsDenyAccessCustomWhenConfigured() {
 		// This test only works with our test stubs, not in MediaWiki's PHPUnit environment
 		if ( !property_exists( '\MediaWiki\MediaWikiServices', 'testUse418' ) ) {
 			$this->markTestSkipped(
@@ -324,10 +324,10 @@ class HooksTest extends TestCase {
 		$special->method( 'getContext' )->willReturn( $context );
 
 		$runner = $this->getMockBuilder( Hooks::class )
-			->onlyMethods( [ 'denyAccessWith418' ] )
+			->onlyMethods( [ 'denyAccessCustom' ] )
 			->getMock();
-		// When denyFast is true, only denyAccessWith418 is called (it dies before denyAccess)
-		$runner->expects( $this->once() )->method( 'denyAccessWith418' );
+		// When $testUse418 is true, only denyAccessCustom is called (it dies before denyAccess)
+		$runner->expects( $this->once() )->method( 'denyAccessCustom' );
 
 		$result = $runner->onSpecialPageBeforeExecute( $special, null );
 		$this->assertFalse( $result );
