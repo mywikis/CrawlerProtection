@@ -94,6 +94,9 @@ namespace MediaWiki {
 		/** @var bool Control CrawlerProtectionUse418 config for testing */
 		public static $testUse418 = false;
 
+		/** @var array|null Control CrawlerProtectedActions config for testing */
+		public static $testProtectedActions = null;
+
 		/**
 		 * @return MediaWikiServices
 		 */
@@ -131,7 +134,9 @@ namespace MediaWiki {
 				 */
 				public function get( $name ) {
 					if ( $name === 'CrawlerProtectedActions' ) {
-						return [ 'history' ];
+						return MediaWikiServices::$testProtectedActions !== null
+							? MediaWikiServices::$testProtectedActions
+							: [ 'history' ];
 					}
 					if ( $name === 'CrawlerProtectedSpecialPages' ) {
 						return [
