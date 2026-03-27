@@ -41,16 +41,21 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * a mock ResponseFactory.
 	 *
 	 * @param array $protectedPages
+	 * @param array $protectedActions
 	 * @param ResponseFactory|\PHPUnit\Framework\MockObject\MockObject|null $responseFactory
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
 		array $protectedPages = [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ],
+		array $protectedActions = [ 'history' ],
 		$responseFactory = null
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
-			[ 'CrawlerProtectedSpecialPages' => $protectedPages ]
+			[
+				'CrawlerProtectedActions' => $protectedActions,
+				'CrawlerProtectedSpecialPages' => $protectedPages,
+			]
 		);
 
 		$responseFactory ??= $this->createMock( ResponseFactory::class );
@@ -78,7 +83,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -100,7 +105,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ), $msg );
 	}
 
@@ -169,8 +174,94 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksConfiguredAction() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, 'edit' ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService( [], [ 'edit', 'history' ], $responseFactory );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsActionNotInConfig() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, 'history' ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// isProtectedAction tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionReturnsTrueForConfiguredAction() {
+		$service = $this->buildService( [], [ 'history', 'edit' ] );
+		$this->assertTrue( $service->isProtectedAction( 'history' ) );
+		$this->assertTrue( $service->isProtectedAction( 'edit' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionReturnsFalseForUnconfiguredAction() {
+		$service = $this->buildService( [], [ 'history' ] );
+		$this->assertFalse( $service->isProtectedAction( 'view' ) );
+		$this->assertFalse( $service->isProtectedAction( 'edit' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionReturnsFalseForNull() {
+		$service = $this->buildService( [], [ 'history' ] );
+		$this->assertFalse( $service->isProtectedAction( null ) );
+	}
+
+	/**
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionIsCaseInsensitive() {
+		$service = $this->buildService( [], [ 'History' ] );
+		$this->assertTrue( $service->isProtectedAction( 'history' ) );
+		$this->assertTrue( $service->isProtectedAction( 'HISTORY' ) );
+		$this->assertTrue( $service->isProtectedAction( 'History' ) );
 	}
 
 	// ---------------------------------------------------------------
@@ -193,6 +284,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
+			[],
 			$responseFactory
 		);
 		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -214,6 +306,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
+			[],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -232,6 +325,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
+			[],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user ) );

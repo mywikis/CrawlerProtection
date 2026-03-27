@@ -40,6 +40,7 @@ class CrawlerProtectionService {
 
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
+		'CrawlerProtectedActions',
 		'CrawlerProtectedSpecialPages',
 	];
 
@@ -89,7 +90,7 @@ class CrawlerProtectionService {
 
 		if (
 			$type === 'revision'
-			|| $action === 'history'
+			|| $this->isProtectedAction( $action )
 			|| $diffId > 0
 			|| $oldId > 0
 		) {
@@ -98,6 +99,29 @@ class CrawlerProtectionService {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Determine whether the given action name is in the configured
+	 * list of protected actions.
+	 *
+	 * The comparison is case-insensitive so that configured values
+	 * like "History" or "HISTORY" match the action parameter.
+	 *
+	 * @param string|null $action
+	 * @return bool
+	 */
+	public function isProtectedAction( ?string $action ): bool {
+		if ( $action === null ) {
+			return false;
+		}
+
+		$protectedActions = array_map(
+			'strtolower',
+			$this->options->get( 'CrawlerProtectedActions' )
+		);
+
+		return in_array( strtolower( $action ), $protectedActions, true );
 	}
 
 	/**
