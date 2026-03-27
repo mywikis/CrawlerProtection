@@ -33,6 +33,9 @@ use MediaWiki\Output\OutputPage;
  */
 class ResponseFactory {
 
+	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
+	private const TEAPOT_BODY = 'I\'m a teapot';
+
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectionUse418',
@@ -78,7 +81,7 @@ class ResponseFactory {
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessWith418(): void {
-		$this->denyAccessRaw( 'HTTP/1.0 I\'m a teapot', 'I\'m a teapot' );
+		$this->denyAccessRaw( self::TEAPOT_HEADER, self::TEAPOT_BODY );
 	}
 
 	/**
