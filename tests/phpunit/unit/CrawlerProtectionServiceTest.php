@@ -112,19 +112,39 @@ class CrawlerProtectionServiceTest extends TestCase {
 	public function provideBlockedRequestParams(): array {
 		return [
 			'type=revision' => [
-				[ [ 'type', null, 'revision' ], [ 'action', null, null ], [ 'diff', null, null ], [ 'oldid', null, null ] ],
+				[
+					[ 'type', null, 'revision' ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, null ],
+				],
 				'type=revision should be blocked',
 			],
 			'action=history' => [
-				[ [ 'type', null, null ], [ 'action', null, 'history' ], [ 'diff', null, null ], [ 'oldid', null, null ] ],
+				[
+					[ 'type', null, null ],
+					[ 'action', null, 'history' ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, null ],
+				],
 				'action=history should be blocked',
 			],
 			'diff=42' => [
-				[ [ 'type', null, null ], [ 'action', null, null ], [ 'diff', null, '42' ], [ 'oldid', null, null ] ],
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, '42' ],
+					[ 'oldid', null, null ],
+				],
 				'diff=42 should be blocked',
 			],
 			'oldid=99' => [
-				[ [ 'type', null, null ], [ 'action', null, null ], [ 'diff', null, null ], [ 'oldid', null, '99' ] ],
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, '99' ],
+				],
 				'oldid=99 should be blocked',
 			],
 		];

@@ -47,6 +47,12 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessPretty
 	 */
 	public function testDenyAccessPrettySetStatusCode() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
 		$output = $this->createMock( self::$outputPageClassName );
 		$output->expects( $this->once() )
 			->method( 'setStatusCode' )

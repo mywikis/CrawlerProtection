@@ -58,7 +58,7 @@ class ResponseFactory {
 	 * @param OutputPage $output Used only for the "pretty" strategy
 	 * @return void
 	 */
-	public function denyAccess( OutputPage $output ): void {
+	public function denyAccess( $output ): void {
 		if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
 			$this->denyAccessWith418();
 		} elseif ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
@@ -87,6 +87,7 @@ class ResponseFactory {
 	 * @param string $header
 	 * @param string $message
 	 * @return void
+	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessRaw( string $header, string $message ): void {
 		header( $header );
@@ -99,7 +100,7 @@ class ResponseFactory {
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	protected function denyAccessPretty( OutputPage $output ): void {
+	protected function denyAccessPretty( $output ): void {
 		$output->setStatusCode( 403 );
 		$output->addWikiTextAsInterface(
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()

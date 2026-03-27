@@ -72,9 +72,9 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	public function checkPerformAction(
-		OutputPage $output,
-		User $user,
-		WebRequest $request
+		$output,
+		$user,
+		$request
 	): bool {
 		if ( $user->isRegistered() ) {
 			return true;
@@ -111,8 +111,8 @@ class CrawlerProtectionService {
 	 */
 	public function checkSpecialPage(
 		string $specialPageName,
-		OutputPage $output,
-		User $user
+		$output,
+		$user
 	): bool {
 		if ( $user->isRegistered() ) {
 			return true;
