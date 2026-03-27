@@ -27,9 +27,6 @@ jobs:
         include:
           - os: ubuntu-latest
             php: '7.4'
-            mediawiki: REL1_35
-          - os: ubuntu-latest
-            php: '7.4'
             mediawiki: REL1_39
           - os: ubuntu-latest
             php: '8.1'
@@ -52,8 +49,9 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
           composer update
       - name: Lint
@@ -72,9 +70,6 @@ jobs:
         php: [ '8.2', '8.3' ]
         mediawiki: [ REL1_43 ]
         include:
-          - os: ubuntu-latest
-            php: '7.4'
-            mediawiki: REL1_35
           - os: ubuntu-latest
             php: '7.4'
             mediawiki: REL1_39
@@ -99,8 +94,9 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
           composer update
       - name: Phan
@@ -115,9 +111,6 @@ jobs:
         php: [ '8.2', '8.3', '8.4' ]
         mediawiki: [ REL1_43 ]
         include:
-          - os: ubuntu-latest
-            php: '7.4'
-            mediawiki: REL1_35
           - os: ubuntu-latest
             php: '7.4'
             mediawiki: REL1_39
@@ -142,8 +135,9 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
           composer update
       - name: Install MediaWiki

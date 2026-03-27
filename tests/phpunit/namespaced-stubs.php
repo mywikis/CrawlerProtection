@@ -16,6 +16,59 @@ namespace MediaWiki\SpecialPage\Hook {
 	}
 }
 
+// ServiceOptions stub
+namespace MediaWiki\Config {
+	class ServiceOptions {
+		/** @var array */
+		private array $options = [];
+
+		/**
+		 * @param string[] $keys
+		 * @param mixed ...$sources
+		 */
+		public function __construct( array $keys, ...$sources ) {
+			foreach ( $sources as $source ) {
+				if ( $source instanceof Config ) {
+					foreach ( $keys as $key ) {
+						if ( !array_key_exists( $key, $this->options ) ) {
+							$this->options[$key] = $source->get( $key );
+						}
+					}
+				} elseif ( is_array( $source ) ) {
+					foreach ( $keys as $key ) {
+						if ( !array_key_exists( $key, $this->options ) && array_key_exists( $key, $source ) ) {
+							$this->options[$key] = $source[$key];
+						}
+					}
+				}
+			}
+		}
+
+		/**
+		 * @param string[] $expectedKeys
+		 */
+		public function assertRequiredOptions( array $expectedKeys ): void {
+			// no-op in tests
+		}
+
+		/**
+		 * @param string $key
+		 * @return mixed
+		 */
+		public function get( string $key ) {
+			return $this->options[$key] ?? null;
+		}
+	}
+
+	interface Config {
+		/**
+		 * @param string $name
+		 * @return mixed
+		 */
+		public function get( $name );
+	}
+}
+
 // Core classes in their proper namespaces
 namespace MediaWiki\Output {
 	class OutputPage {
@@ -76,23 +129,10 @@ namespace MediaWiki\Actions {
 	}
 }
 
-namespace MediaWiki\Config {
-	interface Config {
-		/**
-		 * @param string $name
-		 * @return mixed
-		 */
-		public function get( $name );
-	}
-}
-
 namespace MediaWiki {
 	class MediaWikiServices {
 		/** @var MediaWikiServices|null */
 		private static $instance = null;
-
-		/** @var bool Control CrawlerProtectionUse418 config for testing */
-		public static $testUse418 = false;
 
 		/**
 		 * @return MediaWikiServices
@@ -130,19 +170,6 @@ namespace MediaWiki {
 				 * @return mixed
 				 */
 				public function get( $name ) {
-					if ( $name === 'CrawlerProtectedSpecialPages' ) {
-						return [
-							'RecentChangesLinked',
-							'WhatLinksHere',
-							'MobileDiff',
-							'recentchangeslinked',
-							'whatlinkshere',
-							'mobilediff'
-						];
-					}
-					if ( $name === 'CrawlerProtectionUse418' ) {
-						return MediaWikiServices::$testUse418;
-					}
 					return null;
 				}
 			};
