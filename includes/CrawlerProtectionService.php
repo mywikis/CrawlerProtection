@@ -38,9 +38,6 @@ use MediaWiki\User\User;
  */
 class CrawlerProtectionService {
 
-	/** @var string Prefix for special page names */
-	private const SPECIAL_PAGE_PREFIX = 'Special:';
-
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectedSpecialPages',
@@ -135,18 +132,27 @@ class CrawlerProtectionService {
 	 * Determine whether the given special page name is in the
 	 * configured list of protected special pages.
 	 *
+	 * Because this method is only called from the SpecialPageBeforeExecute
+	 * hook, any "Foo:" prefix on a configured value is necessarily the
+	 * "Special" namespace in English or its localized equivalent (e.g.
+	 * "Spezial:" in German). We therefore simply strip everything up to
+	 * and including the first colon rather than checking for a specific
+	 * namespace name, which keeps the logic language-agnostic.
+	 *
 	 * @param string $specialPageName
 	 * @return bool
 	 */
 	public function isProtectedSpecialPage( string $specialPageName ): bool {
 		$protectedSpecialPages = $this->options->get( 'CrawlerProtectedSpecialPages' );
 
-		// Normalize protected special pages: lowercase and strip 'Special:' prefix
+		// Normalize protected special pages: lowercase and strip any
+		// namespace prefix (everything up to and including the first ':').
 		$normalizedProtectedPages = array_map(
 			static function ( string $p ): string {
 				$lower = strtolower( $p );
-				if ( strpos( $lower, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0 ) {
-					return substr( $lower, strlen( self::SPECIAL_PAGE_PREFIX ) );
+				$colonPos = strpos( $lower, ':' );
+				if ( $colonPos !== false ) {
+					return substr( $lower, $colonPos + 1 );
 				}
 				return $lower;
 			},

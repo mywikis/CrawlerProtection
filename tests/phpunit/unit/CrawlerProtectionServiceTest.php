@@ -268,6 +268,22 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
+	 * @covers ::isProtectedSpecialPage
+	 */
+	public function testIsProtectedSpecialPageStripsLocalizedPrefix() {
+		$service = $this->buildService( [ 'Spezial:WhatLinksHere' ] );
+		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedSpecialPage
+	 */
+	public function testIsProtectedSpecialPageStripsAnyPrefix() {
+		$service = $this->buildService( [ 'Especial:WhatLinksHere' ] );
+		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+	}
+
+	/**
 	 * Data provider for blocked special pages.
 	 *
 	 * @return array
