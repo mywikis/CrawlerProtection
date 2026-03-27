@@ -49,6 +49,7 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
           echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
@@ -93,6 +94,7 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
           echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
@@ -133,6 +135,7 @@ jobs:
         with:
           path: extensions/${{ env.EXTNAME }}
       - name: Setup Composer
+        # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
           echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
           composer update
