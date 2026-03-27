@@ -1,4 +1,22 @@
 <?php
+/**
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * http://www.gnu.org/copyleft/gpl.html
+ *
+ * @file
+ */
 
 namespace MediaWiki\Extension\CrawlerProtection;
 
@@ -26,7 +44,6 @@ if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
 
 use MediaWiki\Actions\ActionEntryPoint;
 use MediaWiki\Hook\MediaWikiPerformActionHook;
-use MediaWiki\MediaWikiServices;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
@@ -35,19 +52,27 @@ use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
 
+/**
+ * Hook handler for the CrawlerProtection extension.
+ *
+ * This is a thin delegation layer. All business logic lives in
+ * CrawlerProtectionService and ResponseFactory, which are injected
+ * via the service container (see ServiceWiring.php and extension.json).
+ */
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
-	/** @var string Prefix for special page names */
-	private const SPECIAL_PAGE_PREFIX = 'Special:';
+
+	/** @var CrawlerProtectionService */
+	private CrawlerProtectionService $crawlerProtectionService;
+
+	/**
+	 * @param CrawlerProtectionService $crawlerProtectionService
+	 */
+	public function __construct( CrawlerProtectionService $crawlerProtectionService ) {
+		$this->crawlerProtectionService = $crawlerProtectionService;
+	}
 
 	/**
 	 * Block sensitive page views for anonymous users via MediaWikiPerformAction.
-	 * Handles:
-	 *  - ?type=revision
-	 *  - ?action=history
-	 *  - ?diff=1234
-	 *  - ?oldid=1234
-	 *
-	 * Special pages (e.g. Special:WhatLinksHere) are handled separately.
 	 *
 	 * @param OutputPage $output
 	 * @param Article $article
@@ -65,123 +90,25 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$request,
 		$mediaWiki
 	) {
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-
-		$type = $request->getVal( 'type' );
-		$action = $request->getVal( 'action' );
-		$diffId = (int)$request->getVal( 'diff' );
-		$oldId = (int)$request->getVal( 'oldid' );
-
-		if (
-			!$user->isRegistered()
-			&& (
-				$type === 'revision'
-				|| $action === 'history'
-				|| $diffId > 0
-				|| $oldId > 0
-			)
-		) {
-			$this->denyAccess( $output );
-		}
-
-		return true;
+		return $this->crawlerProtectionService->checkPerformAction(
+			$output,
+			$user,
+			$request
+		);
 	}
 
 	/**
-	 * Block Special:RecentChangesLinked, Special:WhatLinksHere, and Special:MobileDiff for anonymous users.
+	 * Block protected special pages for anonymous users.
 	 *
 	 * @param SpecialPage $special
 	 * @param string|null $subPage
 	 * @return bool False to abort execution
 	 */
 	public function onSpecialPageBeforeExecute( $special, $subPage ) {
-		$user = $special->getContext()->getUser();
-		if ( $user->isRegistered() ) {
-			// logged-in users: allow
-			return true;
-		}
-
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-		$protectedSpecialPages = $config->get( 'CrawlerProtectedSpecialPages' );
-		$denyFast = $config->get( 'CrawlerProtectionUse418' );
-
-		// Normalize protected special pages: lowercase and strip 'Special:' prefix
-		$normalizedProtectedPages = array_map(
-			fn ( $p ) => ( $p = strtolower( $p ) ) && strpos( $p, strtolower( self::SPECIAL_PAGE_PREFIX ) ) === 0
-				? substr( $p, 8 )
-				: $p,
-			$protectedSpecialPages
+		return $this->crawlerProtectionService->checkSpecialPage(
+			$special->getName(),
+			$special->getContext()->getOutput(),
+			$special->getContext()->getUser()
 		);
-
-		$name = strtolower( $special->getName() );
-		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
-			$outputPage = $special->getContext()->getOutput();
-			$this->denyAccess( $outputPage );
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Helper: Triage denial method based on config
-	 */
-	protected function denyAccess( OutputPage $output ): void {
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-		
-		$rawDenial = $config->get( 'CrawlerProtectionRawDenial' );
-		$denyWith418 = $config->get( 'CrawlerProtectionUse418' );
-
-		if ( $denyWith418 ) {
-			$this->denyAccessWith418();
-		} elseif ( $rawDenial ) {
-			$this->denyAccessRaw(
-				$config->get( 'CrawlerProtectionRawDenialHeader' ),
-				$config->get( 'CrawlerProtectionRawDenialText' )
-			);
-		} else {
-			$this->denyAccessPretty( $output );
-		}
-	}
-
-	/**
-	 * Helper: output 418 Teapot and halt the processing immediately
-	 *
-	 * @return void
-	 * @suppress PhanPluginNeverReturnMethod
-	 */
-	protected function denyAccessWith418() {
-		$this->denyAccessRaw( 'HTTP/1.0 I\'m a teapot', 'I\'m a teapot' );
-	}
-
-	/**
-	 * Helper: output raw HTTP response and halt the processing immediately
-	 *
-	 * @param string $header
-	 * @param string $message
-	 * @return void
-	 */
-	protected function denyAccessRaw( string $header, string $message ): void {
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-		header( $header );
-		die( $message );
-	}
-
-	/**
-	 * Helper: output a pretty 403 Access Denied page using i18n messages.
-	 *
-	 * @param OutputPage $output
-	 * @return void
-	 */
-	protected function denyAccessPretty( OutputPage $output ): void {
-		$output->setStatusCode( 403 );
-		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
-
-		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
-			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		} else {
-			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
-			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		}
 	}
 }

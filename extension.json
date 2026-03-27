@@ -13,7 +13,9 @@
     "HookHandlers": {
         "main": {
             "class": "MediaWiki\\Extension\\CrawlerProtection\\Hooks",
-            "services": []
+            "services": [
+                "CrawlerProtection.CrawlerProtectionService"
+            ]
         }
     },
     "Hooks": {
@@ -41,6 +43,9 @@
             "value": "403 Forbidden"
         }
     },
+    "ServiceWiringFiles": [
+        "includes/ServiceWiring.php"
+    ],
     "license-name": "MIT",
     "Tests": {
         "phpunit": "tests/phpunit"
