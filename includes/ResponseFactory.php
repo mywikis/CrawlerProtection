@@ -63,17 +63,27 @@ class ResponseFactory {
 	/**
 	 * Deny access using the configured strategy.
 	 *
+	 * When CrawlerProtectionRawDenial is enabled, a raw HTTP response is
+	 * sent.  If CrawlerProtectionUse418 is *also* enabled the response
+	 * uses the 418 "I'm a teapot" status; otherwise the configured
+	 * header / body are used.
+	 *
+	 * When CrawlerProtectionRawDenial is disabled, a pretty 403 page is
+	 * rendered through OutputPage regardless of the Use418 setting.
+	 *
 	 * @param OutputPage $output Used only for the "pretty" strategy
 	 * @return void
 	 */
 	public function denyAccess( $output ): void {
-		if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
-			$this->denyAccessWith418();
-		} elseif ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
-			$this->denyAccessRaw(
-				$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
-				$this->options->get( 'CrawlerProtectionRawDenialText' )
-			);
+		if ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
+			if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
+				$this->denyAccessWith418();
+			} else {
+				$this->denyAccessRaw(
+					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
+					$this->options->get( 'CrawlerProtectionRawDenialText' )
+				);
+			}
 		} else {
 			$this->denyAccessPretty( $output );
 		}

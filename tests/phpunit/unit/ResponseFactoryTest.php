@@ -67,12 +67,12 @@ class ResponseFactoryTest extends TestCase {
 	/**
 	 * @covers ::denyAccess
 	 */
-	public function testDenyAccessChooses418WhenConfigured() {
+	public function testDenyAccessChooses418WhenBothRawAndUse418() {
 		$factory = $this->getMockBuilder( ResponseFactory::class )
 			->setConstructorArgs( [
 				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
 					'CrawlerProtectionUse418' => true,
-					'CrawlerProtectionRawDenial' => false,
+					'CrawlerProtectionRawDenial' => true,
 					'CrawlerProtectionRawDenialHeader' => '',
 					'CrawlerProtectionRawDenialText' => '',
 				] )
@@ -83,6 +83,35 @@ class ResponseFactoryTest extends TestCase {
 		$factory->expects( $this->once() )->method( 'denyAccessWith418' );
 
 		$output = $this->createMock( self::$outputPageClassName );
+		$factory->denyAccess( $output );
+	}
+
+	/**
+	 * When RawDenial is false, Use418 should be a no-op and the factory
+	 * must fall through to the pretty 403 page.
+	 *
+	 * @covers ::denyAccess
+	 */
+	public function testDenyAccessIgnoresUse418WhenRawDenialDisabled() {
+		$factory = $this->getMockBuilder( ResponseFactory::class )
+			->setConstructorArgs( [
+				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
+					'CrawlerProtectionUse418' => true,
+					'CrawlerProtectionRawDenial' => false,
+					'CrawlerProtectionRawDenialHeader' => '',
+					'CrawlerProtectionRawDenialText' => '',
+				] )
+			] )
+			->onlyMethods( [ 'denyAccessPretty', 'denyAccessWith418' ] )
+			->getMock();
+
+		$factory->expects( $this->never() )->method( 'denyAccessWith418' );
+
+		$output = $this->createMock( self::$outputPageClassName );
+		$factory->expects( $this->once() )
+			->method( 'denyAccessPretty' )
+			->with( $output );
+
 		$factory->denyAccess( $output );
 	}
 
