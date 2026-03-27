@@ -1,7 +1,7 @@
 {
     "name": "CrawlerProtection",
     "author": "MyWikis LLC",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Suite of protective measures to protect wikis from crawlers.",
     "type": "hook",
     "requires": {
@@ -28,8 +28,17 @@
                 "whatlinkshere"
             ]
         },
+        "CrawlerProtectionRawDenial": {
+            "value": false
+        },
         "CrawlerProtectionUse418": {
             "value": false
+        },
+        "CrawlerProtectionRawDenialHeader": {
+            "value": "HTTP/1.0 403 Forbidden"
+        },
+        "CrawlerProtectionRawDenialText": {
+            "value": "403 Forbidden"
         }
     },
     "license-name": "MIT",

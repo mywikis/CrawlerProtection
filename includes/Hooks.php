@@ -65,6 +65,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		$request,
 		$mediaWiki
 	) {
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+
 		$type = $request->getVal( 'type' );
 		$action = $request->getVal( 'action' );
 		$diffId = (int)$request->getVal( 'diff' );
@@ -80,7 +82,6 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			)
 		) {
 			$this->denyAccess( $output );
-			return false;
 		}
 
 		return true;
@@ -114,15 +115,33 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 
 		$name = strtolower( $special->getName() );
 		if ( in_array( $name, $normalizedProtectedPages, true ) ) {
-			$out = $special->getContext()->getOutput();
-			if ( $denyFast ) {
-				$this->denyAccessWith418();
-			}
-			$this->denyAccess( $out );
+			$outputPage = $special->getContext()->getOutput();
+			$this->denyAccess( $outputPage );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Helper: Triage denial method based on config
+	 */
+	protected function denyAccess( OutputPage $output ): void {
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+		
+		$rawDenial = $config->get( 'CrawlerProtectionRawDenial' );
+		$denyWith418 = $config->get( 'CrawlerProtectionUse418' );
+
+		if ( $denyWith418 ) {
+			$this->denyAccessWith418();
+		} elseif ( $rawDenial ) {
+			$this->denyAccessRaw(
+				$config->get( 'CrawlerProtectionRawDenialHeader' ),
+				$config->get( 'CrawlerProtectionRawDenialText' )
+			);
+		} else {
+			$this->denyAccessPretty( $output );
+		}
 	}
 
 	/**
@@ -132,17 +151,29 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessWith418() {
-		header( 'HTTP/1.0 I\'m a teapot' );
-		die( 'I\'m a teapot' );
+		$this->denyAccessRaw( 'HTTP/1.0 I\'m a teapot', 'I\'m a teapot' );
 	}
 
 	/**
-	 * Helper: output 403 Access Denied page using i18n messages.
+	 * Helper: output raw HTTP response and halt the processing immediately
+	 *
+	 * @param string $header
+	 * @param string $message
+	 * @return void
+	 */
+	protected function denyAccessRaw( string $header, string $message ): void {
+		$config = MediaWikiServices::getInstance()->getMainConfig();
+		header( $header );
+		die( $message );
+	}
+
+	/**
+	 * Helper: output a pretty 403 Access Denied page using i18n messages.
 	 *
 	 * @param OutputPage $output
 	 * @return void
 	 */
-	protected function denyAccess( $output ): void {
+	protected function denyAccessPretty( OutputPage $output ): void {
 		$output->setStatusCode( 403 );
 		$output->addWikiTextAsInterface( wfMessage( 'crawlerprotection-accessdenied-text' )->plain() );
 
