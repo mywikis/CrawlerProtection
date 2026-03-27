@@ -40,7 +40,7 @@
             "value": "HTTP/1.0 403 Forbidden"
         },
         "CrawlerProtectionRawDenialText": {
-            "value": "403 Forbidden"
+            "value": "403 Forbidden. You must be logged in to view this page."
         }
     },
     "ServiceWiringFiles": [

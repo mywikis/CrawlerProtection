@@ -8,9 +8,13 @@ applyTo: "*"
 
 Use the service container pattern (based on MediaWikiServices) to define how key objects are constructed and wired together.
 
+Absolutely no MediaWikiServices references should be in the code because everything should be injected.
+
 ## Dependency injection
 
 Use this example from PluggableAuth to implement dependency injection.
+
+Objects should only be instantiated in `ServiceWiring.php`, not in any other file.
 
 Below is an `includes/ServiceWiring.php` file.
 
