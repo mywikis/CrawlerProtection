@@ -85,7 +85,9 @@ class ResponseFactory {
 				);
 			}
 		} else {
+			$output->clearHTML();
 			$this->denyAccessPretty( $output );
+			$output->returnToMain();
 		}
 	}
 
@@ -119,7 +121,6 @@ class ResponseFactory {
 	 * @return void
 	 */
 	protected function denyAccessPretty( $output ): void {
-		$output->clearHTML();
 		$output->setStatusCode( 403 );
 
 		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
@@ -132,6 +133,5 @@ class ResponseFactory {
 		$output->addWikiTextAsInterface(
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()
 		);
-		$output->returnToMain();
 	}
 }
