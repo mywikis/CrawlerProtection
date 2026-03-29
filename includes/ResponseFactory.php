@@ -77,7 +77,10 @@ class ResponseFactory {
 	public function denyAccess( $output ): void {
 		if ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
 			if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
-				$this->denyAccessWith418();
+				$this->denyAccessRaw(
+					self::TEAPOT_HEADER,
+					self::TEAPOT_BODY
+				);
 			} else {
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
@@ -89,16 +92,6 @@ class ResponseFactory {
 			$this->denyAccessPretty( $output );
 			$output->returnToMain();
 		}
-	}
-
-	/**
-	 * Output a 418 "I'm a teapot" response and halt.
-	 *
-	 * @return void
-	 * @suppress PhanPluginNeverReturnMethod
-	 */
-	protected function denyAccessWith418(): void {
-		$this->denyAccessRaw( self::TEAPOT_HEADER, self::TEAPOT_BODY );
 	}
 
 	/**
