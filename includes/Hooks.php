@@ -25,31 +25,13 @@
 
 namespace MediaWiki\Extension\CrawlerProtection;
 
-// Class aliases for multi-version compatibility.
-// These need to be in global scope so phan can pick up on them,
-// and before any use statements that make use of the namespaced names.
-
-if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
-	class_alias( '\OutputPage', '\MediaWiki\Output\OutputPage' );
-	class_alias( '\SpecialPage', '\MediaWiki\SpecialPage\SpecialPage' );
-	class_alias( '\User', '\MediaWiki\User\User' );
-	class_alias( '\WebRequest', '\MediaWiki\Request\WebRequest' );
-}
-
-if ( version_compare( MW_VERSION, '1.42', '<' ) ) {
-	class_alias( '\MediaWiki', '\MediaWiki\Actions\ActionEntryPoint' );
-}
-
-if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
-	class_alias( '\Article', '\MediaWiki\Page\Article' );
-}
+use MediaWiki\Hook\MediaWikiPerformActionHook;
+use MediaWiki\SpecialPage\Hook\SpecialPageBeforeExecuteHook;
 
 use MediaWiki\Actions\ActionEntryPoint;
-use MediaWiki\Hook\MediaWikiPerformActionHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
-use MediaWiki\SpecialPage\Hook\SpecialPageBeforeExecuteHook;
 use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
@@ -62,6 +44,10 @@ use MediaWiki\User\User;
  * via the service container (see ServiceWiring.php and extension.json).
  */
 class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook {
+
+    public static function onRegistration() {
+        Compat::init();
+    }
 
 	/** @var CrawlerProtectionService */
 	private CrawlerProtectionService $crawlerProtectionService;
