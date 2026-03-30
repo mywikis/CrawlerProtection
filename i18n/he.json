@@ -1,0 +1,8 @@
+{
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "סדרת אמצעי הגנה להגנה על ויקי מפני סורקים.",
+	"crawlerprotection-accessdenied-title": "גישה נדחתה",
+	"crawlerprotection-accessdenied-text": "עליך להיות מחובר כדי לבצע פעולה זו או להציג דף מיוחד זה. אנא [[Special:UserLogin|התחבר]] כדי להמשיך."
+}
