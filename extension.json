@@ -3,7 +3,7 @@
     "author": "MyWikis LLC",
     "version": "1.3.0",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
-    "description": "Suite of protective measures to protect wikis from crawlers.",
+    "descriptionmsg": "crawlerprotection-desc",
     "type": "hook",
     "requires": {
         "MediaWiki": ">= 1.39.4"
