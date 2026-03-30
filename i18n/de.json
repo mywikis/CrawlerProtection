@@ -1,7 +1,8 @@
 {
-    "@metadata": {
-        "authors": [ "MyWikis LLC" ]
-    },
-    "crawlerprotection-accessdenied-title": "Zugriff verweigert",
-    "crawlerprotection-accessdenied-text": "Anmeldung erforderlich, um diese Aktion auzuführen oder Spezialseite anzusehen."
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "Eine Reihe von Schutzmaßnahmen zum Schutz von Wikis vor Crawlern.",
+	"crawlerprotection-accessdenied-title": "Zugriff verweigert",
+	"crawlerprotection-accessdenied-text": "Anmeldung erforderlich, um diese Aktion auzuführen oder Spezialseite anzusehen. Bitte [[Special:UserLogin|melden Sie sich an]], um fortzufahren."
 }
