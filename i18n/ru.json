@@ -1,0 +1,8 @@
+{
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "Набор защитных мер для защиты вики-сайтов от краулеров.",
+	"crawlerprotection-accessdenied-title": "Доступ запрещен",
+	"crawlerprotection-accessdenied-text": "Для выполнения этого действия или просмотра этой специальной страницы необходимо войти в систему. Пожалуйста, [[Special:UserLogin|войдите в систему]], чтобы продолжить."
+}
