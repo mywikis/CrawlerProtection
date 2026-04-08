@@ -288,7 +288,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
-            [],
+			[],
 			$responseFactory
 		);
 		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -311,7 +311,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
-            [],
+			[],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -331,7 +331,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
-            [],
+			[],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user ) );
