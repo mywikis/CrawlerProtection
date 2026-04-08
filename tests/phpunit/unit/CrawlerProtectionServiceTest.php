@@ -86,7 +86,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -108,7 +108,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ), $msg );
 	}
 
@@ -177,7 +177,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -200,7 +200,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], [ 'edit', 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'edit', 'history' ], [], $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -223,7 +223,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [], $responseFactory );
+		$service = $this->buildService( [], [], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -288,6 +288,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
+            [],
 			$responseFactory
 		);
 		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -310,6 +311,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
+            [],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -329,6 +331,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
+            [],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user ) );
@@ -422,7 +425,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory, $allowedIPs );
+		$service = $this->buildService( [], [ 'history' ], $allowedIPs, $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -447,7 +450,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory, $allowedIPs );
+		$service = $this->buildService( [], [ 'history' ], $allowedIPs, $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
