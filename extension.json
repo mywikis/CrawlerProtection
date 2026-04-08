@@ -47,6 +47,9 @@
         },
         "CrawlerProtectionRawDenialText": {
             "value": "403 Forbidden. You must be logged in to view this page."
+        },
+        "CrawlerProtectionAllowedIPs": {
+            "value": []
         }
     },
     "ServiceWiringFiles": [
