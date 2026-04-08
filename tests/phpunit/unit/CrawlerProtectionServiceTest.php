@@ -462,8 +462,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 			'IPv6 Single IP mismatch' => [ [ '2001:0db8:85a3::7344' ], '2001:0db8:85a3::7345' ],
 			'IPv6 CIDR mismatch' => [ [ '2001:0db8:85a3::/96' ], '2001:0db8:85a4::7344' ],
 			'IPv6 Explicit range mismatch' => [
-                [ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7351'
-            ],
+				[ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7351'
+			],
 		];
 	}
 
@@ -475,8 +475,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 			'IPv6 Single IP' => [ [ '2001:0db8:85a3::7344' ], '2001:0db8:85a3::7344' ],
 			'IPv6 CIDR match' => [ [ '2001:0db8:85a3::/96' ], '2001:0db8:85a3::7344' ],
 			'IPv6 Explicit range match' => [
-                [ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7344'
-            ],
+				[ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7344'
+			],
 			'String instead of array' => [ '1.2.3.4', '1.2.3.4' ],
 		];
 	}
