@@ -1,0 +1,8 @@
+{
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "Ensemble de mesures de protection visant à protéger les wikis contre les robots d'indexation.",
+	"crawlerprotection-accessdenied-title": "Accès refusé",
+	"crawlerprotection-accessdenied-text": "Connexion requise pour effectuer cette action ou consulter cette page spéciale. Veuillez [[Special:UserLogin|vous connecter]] pour continuer."
+}

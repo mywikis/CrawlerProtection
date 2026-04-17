@@ -1,7 +1,8 @@
 {
-    "@metadata": {
-        "authors": [ "MyWikis LLC" ]
-    },
-    "crawlerprotection-accessdenied-title": "Access denied",
-    "crawlerprotection-accessdenied-text": "You must be logged in to perform this action or view this special page."
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "Anti-crawler suite which blocks anonymous users from performing actions or accessing special pages most frequently abused by crawlers.",
+	"crawlerprotection-accessdenied-title": "Access denied",
+	"crawlerprotection-accessdenied-text": "You must be logged in to perform this action or view this special page. Please [[Special:UserLogin|log in]] to continue."
 }

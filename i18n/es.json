@@ -1,0 +1,8 @@
+{
+	"@metadata": {
+		"authors": [ "MyWikis LLC" ]
+	},
+	"crawlerprotection-desc": "Conjunto de medidas de protección para proteger los wikis de los rastreadores.",
+	"crawlerprotection-accessdenied-title": "Acceso denegado",
+	"crawlerprotection-accessdenied-text": "Es necesario iniciar sesión para realizar esta acción o ver esta página especial. Por favor, [[Special:UserLogin|inicia sesión]] para continuar."
+}
