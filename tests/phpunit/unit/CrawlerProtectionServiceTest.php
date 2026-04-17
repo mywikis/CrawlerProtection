@@ -42,12 +42,14 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 *
 	 * @param array $protectedPages
 	 * @param array $protectedActions
+	 * @param string|array $allowedIPs
 	 * @param ResponseFactory|\PHPUnit\Framework\MockObject\MockObject|null $responseFactory
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
 		array $protectedPages = [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ],
 		array $protectedActions = [ 'history' ],
+		$allowedIPs = [],
 		$responseFactory = null
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
@@ -55,6 +57,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[
 				'CrawlerProtectedActions' => $protectedActions,
 				'CrawlerProtectedSpecialPages' => $protectedPages,
+				'CrawlerProtectionAllowedIPs' => $allowedIPs
 			]
 		);
 
@@ -83,7 +86,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -105,7 +108,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ), $msg );
 	}
 
@@ -174,7 +177,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [ 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -197,7 +200,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$service = $this->buildService( [], [ 'edit', 'history' ], $responseFactory );
+		$service = $this->buildService( [], [ 'edit', 'history' ], [], $responseFactory );
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -220,7 +223,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [], $responseFactory );
+		$service = $this->buildService( [], [], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -285,6 +288,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
+			[],
 			$responseFactory
 		);
 		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -307,6 +311,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
 			[],
+			[],
 			$responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
@@ -325,6 +330,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService(
 			[ 'RecentChangesLinked', 'WhatLinksHere', 'MobileDiff' ],
+			[],
 			[],
 			$responseFactory
 		);
@@ -391,6 +397,87 @@ class CrawlerProtectionServiceTest extends TestCase {
 			'WhatLinksHere lowercase' => [ 'whatlinkshere' ],
 			'MobileDiff lowercase' => [ 'mobilediff' ],
 			'MobileDiff mixed case' => [ 'MoBiLeDiFf' ],
+		];
+	}
+
+	// ---------------------------------------------------------------
+	// isIPAllowed tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideAllowedIPs
+	 *
+	 * @param array|string $allowedIPs
+	 * @param string $ip
+	 */
+	public function testCheckPerformActionAllowsAllowedIPs( $allowedIPs, string $ip ) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( $ip );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], $allowedIPs, $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideBlockedIPs
+	 *
+	 * @param array $allowedIPs
+	 * @param string $ip
+	 */
+	public function testCheckPerformActionBlocksNotAllowedIPs( array $allowedIPs, string $ip ) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( $ip );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService( [], [ 'history' ], $allowedIPs, $responseFactory );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	public function provideBlockedIPs(): array {
+		return [
+			'IPv4 Single IP mismatch' => [ [ '1.2.3.4' ], '1.2.3.5' ],
+			'IPv4 CIDR mismatch' => [ [ '1.2.3.0/24' ], '1.2.4.4' ],
+			'IPv4 Explicit range mismatch' => [ [ '1.2.3.1 - 1.2.3.10' ], '1.2.3.11' ],
+			'IPv6 Single IP mismatch' => [ [ '2001:0db8:85a3::7344' ], '2001:0db8:85a3::7345' ],
+			'IPv6 CIDR mismatch' => [ [ '2001:0db8:85a3::/96' ], '2001:0db8:85a4::7344' ],
+			'IPv6 Explicit range mismatch' => [
+				[ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7351'
+			],
+		];
+	}
+
+	public function provideAllowedIPs(): array {
+		return [
+			'IPv4 Single IP' => [ [ '1.2.3.4' ], '1.2.3.4' ],
+			'IPv4 CIDR match' => [ [ '1.2.3.0/24' ], '1.2.3.4' ],
+			'IPv4 Explicit range match' => [ [ '1.2.3.1 - 1.2.3.10' ], '1.2.3.4' ],
+			'IPv6 Single IP' => [ [ '2001:0db8:85a3::7344' ], '2001:0db8:85a3::7344' ],
+			'IPv6 CIDR match' => [ [ '2001:0db8:85a3::/96' ], '2001:0db8:85a3::7344' ],
+			'IPv6 Explicit range match' => [
+				[ '2001:0db8:85a3::7340 - 2001:0db8:85a3::7350' ], '2001:0db8:85a3::7344'
+			],
+			'String instead of array' => [ '1.2.3.4', '1.2.3.4' ],
 		];
 	}
 }

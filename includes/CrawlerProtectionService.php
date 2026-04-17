@@ -29,6 +29,7 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\User\User;
+use Wikimedia\IPUtils;
 
 /**
  * Core business logic for CrawlerProtection.
@@ -42,6 +43,7 @@ class CrawlerProtectionService {
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectedActions',
 		'CrawlerProtectedSpecialPages',
+		'CrawlerProtectionAllowedIPs',
 	];
 
 	/** @var ServiceOptions */
@@ -79,7 +81,7 @@ class CrawlerProtectionService {
 		$user,
 		$request
 	): bool {
-		if ( $user->isRegistered() ) {
+		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
 			return true;
 		}
 
@@ -140,7 +142,7 @@ class CrawlerProtectionService {
 		$output,
 		$user
 	): bool {
-		if ( $user->isRegistered() ) {
+		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
 			return true;
 		}
 
@@ -186,5 +188,21 @@ class CrawlerProtectionService {
 		$name = strtolower( $specialPageName );
 
 		return in_array( $name, $normalizedProtectedPages, true );
+	}
+
+	/**
+	 * Checks whether the given IP is in an allowed IP range.
+	 *
+	 * @param string $ip
+	 * @return bool
+	 */
+	private function isIPAllowed( string $ip ): bool {
+		$allowedIPs = $this->options->get( 'CrawlerProtectionAllowedIPs' );
+
+		if ( !is_array( $allowedIPs ) ) {
+			$allowedIPs = [ $allowedIPs ];
+		}
+
+		return IPUtils::isInRanges( $ip, $allowedIPs );
 	}
 }
