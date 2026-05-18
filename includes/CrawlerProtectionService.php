@@ -90,11 +90,20 @@ class CrawlerProtectionService {
 		$diffId = (int)$request->getVal( 'diff' );
 		$oldId = (int)$request->getVal( 'oldid' );
 
+		// The type=revision, diff and oldid parameters are all ways of
+		// viewing page history. They are only blocked when 'history' is
+		// in the configured list of protected actions, so that operators
+		// can fully disable history blocking by removing 'history' from
+		// $wgCrawlerProtectedActions.
+		$historyProtected = $this->isProtectedAction( 'history' );
+
 		if (
-			$type === 'revision'
-			|| $this->isProtectedAction( $action )
-			|| $diffId > 0
-			|| $oldId > 0
+			$this->isProtectedAction( $action )
+			|| ( $historyProtected && (
+				$type === 'revision'
+				|| $diffId > 0
+				|| $oldId > 0
+			) )
 		) {
 			$this->responseFactory->denyAccess( $output );
 			return false;

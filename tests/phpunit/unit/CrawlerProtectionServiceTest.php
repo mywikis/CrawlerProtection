@@ -205,6 +205,83 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
+	 * When 'history' is removed from CrawlerProtectedActions, the
+	 * history-related parameters (type=revision, diff, oldid) should
+	 * also be allowed, so that operators can fully disable history
+	 * blocking via configuration (see issue: history can't be unblocked).
+	 *
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideHistoryRelatedRequestParams
+	 *
+	 * @param array $getValMap
+	 * @param string $msg
+	 */
+	public function testCheckPerformActionAllowsHistoryRelatedWhenNotConfigured(
+		array $getValMap, string $msg
+	) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '127.0.0.1' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( $getValMap );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ), $msg );
+	}
+
+	/**
+	 * Data provider for history-related parameters that should be
+	 * allowed when 'history' is not in CrawlerProtectedActions.
+	 *
+	 * @return array
+	 */
+	public function provideHistoryRelatedRequestParams(): array {
+		return [
+			'action=history' => [
+				[
+					[ 'type', null, null ],
+					[ 'action', null, 'history' ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, null ],
+				],
+				'action=history should be allowed when history not protected',
+			],
+			'type=revision' => [
+				[
+					[ 'type', null, 'revision' ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, null ],
+				],
+				'type=revision should be allowed when history not protected',
+			],
+			'diff=42' => [
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, '42' ],
+					[ 'oldid', null, null ],
+				],
+				'diff=42 should be allowed when history not protected',
+			],
+			'oldid=99' => [
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, '99' ],
+				],
+				'oldid=99 should be allowed when history not protected',
+			],
+		];
+	}
+
+	/**
 	 * @covers ::checkPerformAction
 	 */
 	public function testCheckPerformActionAllowsActionNotInConfig() {
