@@ -44,6 +44,7 @@ class CrawlerProtectionService {
 		'CrawlerProtectedActions',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
+		'CrawlerProtectionProtectRevisions',
 	];
 
 	/** @var ServiceOptions */
@@ -90,16 +91,16 @@ class CrawlerProtectionService {
 		$diffId = (int)$request->getVal( 'diff' );
 		$oldId = (int)$request->getVal( 'oldid' );
 
-		// The type=revision, diff and oldid parameters are all ways of
-		// viewing page history. They are only blocked when 'history' is
-		// in the configured list of protected actions, so that operators
-		// can fully disable history blocking by removing 'history' from
-		// $wgCrawlerProtectedActions.
-		$historyProtected = $this->isProtectedAction( 'history' );
+		// $wgCrawlerProtectionProtectRevisions independently controls whether
+		// type=revision, diff and oldid requests are blocked. This allows
+		// operators to disable history-listing protection (by removing 'history'
+		// from $wgCrawlerProtectedActions) while still blocking direct access
+		// to individual revisions and diffs, or vice versa.
+		$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
 
 		if (
 			$this->isProtectedAction( $action )
-			|| ( $historyProtected && (
+			|| ( $revisionsProtected && (
 				$type === 'revision'
 				|| $diffId > 0
 				|| $oldId > 0
