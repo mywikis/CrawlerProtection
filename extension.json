@@ -27,14 +27,16 @@
         "CrawlerProtectedActions": {
             "value": [
                 "history"
-            ]
+            ],
+            "merge_strategy": "provide_default"
         },
         "CrawlerProtectedSpecialPages": {
             "value": [
                 "mobilediff",
                 "recentchangeslinked",
                 "whatlinkshere"
-            ]
+            ],
+            "merge_strategy": "provide_default"
         },
         "CrawlerProtectionRawDenial": {
             "value": false
@@ -49,7 +51,8 @@
             "value": "403 Forbidden. You must be logged in to view this page."
         },
         "CrawlerProtectionAllowedIPs": {
-            "value": []
+            "value": [],
+            "merge_strategy": "provide_default"
         }
     },
     "ServiceWiringFiles": [
