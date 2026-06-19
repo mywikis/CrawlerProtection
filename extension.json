@@ -53,6 +53,9 @@
         "CrawlerProtectionAllowedIPs": {
             "value": [],
             "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectionProtectRevisions": {
+            "value": true
         }
     },
     "ServiceWiringFiles": [

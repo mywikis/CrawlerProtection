@@ -44,20 +44,23 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param array $protectedActions
 	 * @param string|array $allowedIPs
 	 * @param ResponseFactory|\PHPUnit\Framework\MockObject\MockObject|null $responseFactory
+	 * @param bool $protectRevisions
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
 		array $protectedPages = [ 'recentchangeslinked', 'whatlinkshere', 'mobilediff' ],
 		array $protectedActions = [ 'history' ],
 		$allowedIPs = [],
-		$responseFactory = null
+		$responseFactory = null,
+		bool $protectRevisions = true
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => $protectedActions,
 				'CrawlerProtectedSpecialPages' => $protectedPages,
-				'CrawlerProtectionAllowedIPs' => $allowedIPs
+				'CrawlerProtectionAllowedIPs' => $allowedIPs,
+				'CrawlerProtectionProtectRevisions' => $protectRevisions,
 			]
 		);
 
@@ -205,10 +208,11 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
-	 * When 'history' is removed from CrawlerProtectedActions, the
-	 * history-related parameters (type=revision, diff, oldid) should
-	 * also be allowed, so that operators can fully disable history
-	 * blocking via configuration (see issue: history can't be unblocked).
+	 * When 'history' is removed from CrawlerProtectedActions, action=history
+	 * should be allowed. When CrawlerProtectionProtectRevisions is false,
+	 * the history-related parameters (type=revision, diff, oldid) should also
+	 * be allowed, so that operators can independently control revision and
+	 * history-listing protection.
 	 *
 	 * @covers ::checkPerformAction
 	 * @dataProvider provideHistoryRelatedRequestParams
@@ -230,7 +234,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$service = $this->buildService( [], [], [], $responseFactory );
+		$service = $this->buildService( [], [], [], $responseFactory, false );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ), $msg );
 	}
 
@@ -302,6 +306,135 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService( [], [], [], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * When CrawlerProtectionProtectRevisions is true and 'history' is NOT in
+	 * CrawlerProtectedActions, revision/diff requests should still be blocked.
+	 * This allows operators to protect individual revisions without protecting
+	 * the history listing page.
+	 *
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideRevisionOnlyRequestParams
+	 *
+	 * @param array $getValMap
+	 * @param string $msg
+	 */
+	public function testCheckPerformActionBlocksRevisionsWhenProtectRevisionsTrueHistoryUnconfigured(
+		array $getValMap, string $msg
+	) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '127.0.0.1' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( $getValMap );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		// history not in protected actions, but protectRevisions = true
+		$service = $this->buildService( [], [], [], $responseFactory, true );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ), $msg );
+	}
+
+	/**
+	 * Data provider for revision/diff request parameters (excludes action=history
+	 * since that is controlled independently by CrawlerProtectedActions).
+	 *
+	 * @return array
+	 */
+	public function provideRevisionOnlyRequestParams(): array {
+		return [
+			'type=revision' => [
+				[
+					[ 'type', null, 'revision' ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, null ],
+				],
+				'type=revision should be blocked when CrawlerProtectionProtectRevisions is true',
+			],
+			'diff=42' => [
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, '42' ],
+					[ 'oldid', null, null ],
+				],
+				'diff=42 should be blocked when CrawlerProtectionProtectRevisions is true',
+			],
+			'oldid=99' => [
+				[
+					[ 'type', null, null ],
+					[ 'action', null, null ],
+					[ 'diff', null, null ],
+					[ 'oldid', null, '99' ],
+				],
+				'oldid=99 should be blocked when CrawlerProtectionProtectRevisions is true',
+			],
+		];
+	}
+
+	/**
+	 * When CrawlerProtectionProtectRevisions is false, revision/diff requests
+	 * should be allowed even when 'history' is in CrawlerProtectedActions.
+	 *
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideRevisionOnlyRequestParams
+	 *
+	 * @param array $getValMap
+	 * @param string $msg
+	 */
+	public function testCheckPerformActionAllowsRevisionsWhenProtectRevisionsFalse(
+		array $getValMap, string $msg
+	) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '127.0.0.1' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( $getValMap );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		// history is protected, but protectRevisions = false
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory, false );
+		$this->assertTrue(
+			$service->checkPerformAction( $output, $user, $request ),
+			$msg
+		);
+	}
+
+	/**
+	 * action=history is controlled solely by CrawlerProtectedActions. It must
+	 * remain blocked even when CrawlerProtectionProtectRevisions is false.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksHistoryListingEvenWhenProtectRevisionsFalse() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '127.0.0.1' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, 'history' ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		// history is protected, but protectRevisions = false
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory, false );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
 	// ---------------------------------------------------------------
