@@ -208,19 +208,18 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
-	 * When 'history' is removed from CrawlerProtectedActions, action=history
-	 * should be allowed. When CrawlerProtectionProtectRevisions is false,
-	 * the history-related parameters (type=revision, diff, oldid) should also
-	 * be allowed, so that operators can independently control revision and
-	 * history-listing protection.
+	 * When CrawlerProtectionProtectRevisions is false and 'history' is not in
+	 * CrawlerProtectedActions, the revision-shaped parameters (type=revision,
+	 * diff, oldid) should be allowed. The action=history allowed-case is
+	 * covered separately by testCheckPerformActionAllowsActionNotInConfig().
 	 *
 	 * @covers ::checkPerformAction
-	 * @dataProvider provideHistoryRelatedRequestParams
+	 * @dataProvider provideRevisionOnlyRequestParams
 	 *
 	 * @param array $getValMap
 	 * @param string $msg
 	 */
-	public function testCheckPerformActionAllowsHistoryRelatedWhenNotConfigured(
+	public function testCheckPerformActionAllowsRevisionsWhenNotConfigured(
 		array $getValMap, string $msg
 	) {
 		$output = $this->createMock( self::$outputPageClassName );
@@ -236,53 +235,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$service = $this->buildService( [], [], [], $responseFactory, false );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ), $msg );
-	}
-
-	/**
-	 * Data provider for history-related parameters that should be
-	 * allowed when 'history' is not in CrawlerProtectedActions.
-	 *
-	 * @return array
-	 */
-	public function provideHistoryRelatedRequestParams(): array {
-		return [
-			'action=history' => [
-				[
-					[ 'type', null, null ],
-					[ 'action', null, 'history' ],
-					[ 'diff', null, null ],
-					[ 'oldid', null, null ],
-				],
-				'action=history should be allowed when history not protected',
-			],
-			'type=revision' => [
-				[
-					[ 'type', null, 'revision' ],
-					[ 'action', null, null ],
-					[ 'diff', null, null ],
-					[ 'oldid', null, null ],
-				],
-				'type=revision should be allowed when history not protected',
-			],
-			'diff=42' => [
-				[
-					[ 'type', null, null ],
-					[ 'action', null, null ],
-					[ 'diff', null, '42' ],
-					[ 'oldid', null, null ],
-				],
-				'diff=42 should be allowed when history not protected',
-			],
-			'oldid=99' => [
-				[
-					[ 'type', null, null ],
-					[ 'action', null, null ],
-					[ 'diff', null, null ],
-					[ 'oldid', null, '99' ],
-				],
-				'oldid=99 should be allowed when history not protected',
-			],
-		];
 	}
 
 	/**
