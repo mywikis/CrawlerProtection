@@ -28,7 +28,7 @@ intensive.
   protecting the history listing page, or vice versa.
 * `$wgCrawlerProtectedQueryParams` - array of special-page query parameters
   that are denied for anonymous users when the request has no `title`
-  parameter (default: `[ 'target' ]`). A request such as
+  parameter, or an empty one (default: `[ 'target' ]`). A request such as
   `index.php?target=Foo&days=365&limit=5000` carries the filter parameters of
   `Special:RecentChangesLinked` but names no special page, so
   `$wgCrawlerProtectedSpecialPages` does not apply to it: MediaWiki ignores

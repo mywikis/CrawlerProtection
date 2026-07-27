@@ -125,11 +125,16 @@ class CrawlerProtectionService {
 	 * parameters, so their presence without one marks the request as
 	 * crawler-generated rather than user-initiated.
 	 *
+	 * An empty or whitespace-only title (for example "title=") counts as
+	 * missing, since it does not name a special page either and MediaWiki
+	 * renders the main page for it.
+	 *
 	 * @param WebRequest $request
 	 * @return bool
 	 */
 	public function hasProtectedQueryParam( $request ): bool {
-		if ( $request->getVal( 'title' ) !== null ) {
+		$title = $request->getVal( 'title' );
+		if ( $title !== null && trim( $title ) !== '' ) {
 			return false;
 		}
 
