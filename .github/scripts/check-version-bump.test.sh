@@ -57,6 +57,11 @@ commit_changes
 expect_pass "hidden-path-only changes"
 
 create_repository
+write_version 1.4.2
+commit_changes
+expect_pass "extension.json-only changes"
+
+create_repository
 echo "Updated content" > README.md
 commit_changes
 expect_fail "content changes without a bump"

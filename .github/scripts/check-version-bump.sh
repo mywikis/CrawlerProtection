@@ -10,6 +10,15 @@ fi
 base_revision=$1
 head_revision=$2
 
+if [[ $base_revision == 0000000000000000000000000000000000000000 ]]; then
+	echo "Skipping version bump check: no base revision (new branch push)."
+	exit 0
+fi
+if ! git cat-file -e "${base_revision}^{commit}" 2>/dev/null; then
+	echo "Base revision '$base_revision' is not a valid commit." >&2
+	exit 2
+fi
+
 mapfile -t changed_files < <(
 	git diff --name-only --no-renames --diff-filter=ACDMRT "$base_revision" "$head_revision"
 )
