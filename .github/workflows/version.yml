@@ -5,9 +5,6 @@ permissions:
 
 on:
   push:
-    branches:
-      - main
-      - specialPageList  # Add your development branch
   pull_request_target:
 
 jobs:
