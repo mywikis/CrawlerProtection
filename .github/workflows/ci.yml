@@ -33,7 +33,7 @@ jobs:
           permission=$(gh api \
             --header "X-GitHub-Api-Version: 2022-11-28" \
             --jq '.permission' \
-            "repos/${REPOSITORY}/collaborators/${ACTOR}/permission")
+            "repos/${REPOSITORY}/collaborators/${ACTOR}/permission" 2>/dev/null) || permission="none"
           if [[ $permission == admin || $permission == maintain ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "Version check overridden by ${ACTOR} (${permission})."
