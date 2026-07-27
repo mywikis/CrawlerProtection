@@ -26,6 +26,17 @@ intensive.
   anonymous access to those URLs. This setting is independent of
   `$wgCrawlerProtectedActions`, so you can protect revisions/diffs without
   protecting the history listing page, or vice versa.
+* `$wgCrawlerProtectedQueryParams` - array of special-page query parameters
+  that are denied for anonymous users when the request has no `title`
+  parameter (default: `[ 'target' ]`). A request such as
+  `index.php?target=Foo&days=365&limit=5000` carries the filter parameters of
+  `Special:RecentChangesLinked` but names no special page, so
+  `$wgCrawlerProtectedSpecialPages` does not apply to it: MediaWiki ignores
+  the parameters and renders the main page instead. Because each such URL is
+  unique it also defeats CDN and reverse-proxy caching, so every request
+  reaches the application. MediaWiki always emits a `title` alongside these
+  parameters, so their presence without one indicates a crawler-generated
+  request. Set to `[]` to disable this check.
 * `$wgCrawlerProtectionUse418` - drop denied requests in a quick way via
   `die();` with
   [418 I'm a teapot](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/418)

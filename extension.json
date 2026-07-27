@@ -38,6 +38,12 @@
             ],
             "merge_strategy": "provide_default"
         },
+        "CrawlerProtectedQueryParams": {
+            "value": [
+                "target"
+            ],
+            "merge_strategy": "provide_default"
+        },
         "CrawlerProtectionRawDenial": {
             "value": false
         },
