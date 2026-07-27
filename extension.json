@@ -1,7 +1,7 @@
 {
     "name": "CrawlerProtection",
     "author": "[https://mywikis.com MyWikis LLC]",
-    "version": "1.4.1",
+    "version": "1.5.0",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
     "description": "Suite of protective measures to protect wikis from crawlers.",
     "type": "hook",
@@ -35,6 +35,12 @@
                 "mobilediff",
                 "recentchangeslinked",
                 "whatlinkshere"
+            ],
+            "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectedQueryParams": {
+            "value": [
+                "target"
             ],
             "merge_strategy": "provide_default"
         },

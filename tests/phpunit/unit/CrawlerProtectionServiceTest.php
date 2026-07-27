@@ -45,6 +45,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param string|array $allowedIPs
 	 * @param ResponseFactory|\PHPUnit\Framework\MockObject\MockObject|null $responseFactory
 	 * @param bool $protectRevisions
+	 * @param array $protectedQueryParams
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
@@ -52,12 +53,14 @@ class CrawlerProtectionServiceTest extends TestCase {
 		array $protectedActions = [ 'history' ],
 		$allowedIPs = [],
 		$responseFactory = null,
-		bool $protectRevisions = true
+		bool $protectRevisions = true,
+		array $protectedQueryParams = [ 'target' ]
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => $protectedActions,
+				'CrawlerProtectedQueryParams' => $protectedQueryParams,
 				'CrawlerProtectedSpecialPages' => $protectedPages,
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
@@ -181,6 +184,185 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
 		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksProtectedQueryParamWithoutTitle() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsProtectedQueryParamWithTitle() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, 'Special:RecentChangesLinked' ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksProtectedQueryParamWithEmptyTitle() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, '' ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksProtectedQueryParamFromCustomList() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, null ],
+			[ 'feedformat', null, 'atom' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'feedformat', 'curid' ]
+		);
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsDefaultParamWhenNotInCustomList() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'feedformat', 'curid' ]
+		);
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsUnconfiguredQueryParam() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, null ],
+			[ 'curid', null, '1234' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsProtectedQueryParamWhenListEmpty() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, null ],
+			[ 'action', null, null ],
+			[ 'diff', null, null ],
+			[ 'oldid', null, null ],
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory, true, [] );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
@@ -427,6 +609,80 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$this->assertTrue( $service->isProtectedAction( 'history' ) );
 		$this->assertTrue( $service->isProtectedAction( 'HISTORY' ) );
 		$this->assertTrue( $service->isProtectedAction( 'History' ) );
+	}
+
+	// ---------------------------------------------------------------
+	// hasProtectedQueryParam tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamReturnsTrueWithoutTitle() {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$service = $this->buildService();
+		$this->assertTrue( $service->hasProtectedQueryParam( $request ) );
+	}
+
+	/**
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamTreatsEmptyTitleAsMissing() {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, '' ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$service = $this->buildService();
+		$this->assertTrue( $service->hasProtectedQueryParam( $request ) );
+	}
+
+	/**
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamTreatsWhitespaceTitleAsMissing() {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, '   ' ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$service = $this->buildService();
+		$this->assertTrue( $service->hasProtectedQueryParam( $request ) );
+	}
+
+	/**
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamReturnsFalseWithTitle() {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, 'Special:RecentChangesLinked' ],
+			[ 'target', null, 'Project:Some_Page' ],
+		] );
+
+		$service = $this->buildService();
+		$this->assertFalse( $service->hasProtectedQueryParam( $request ) );
+	}
+
+	/**
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamReturnsFalseForUnconfiguredParam() {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, null ],
+			[ 'curid', null, '1234' ],
+		] );
+
+		$service = $this->buildService();
+		$this->assertFalse( $service->hasProtectedQueryParam( $request ) );
 	}
 
 	// ---------------------------------------------------------------

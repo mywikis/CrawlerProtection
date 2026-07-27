@@ -42,6 +42,7 @@ class CrawlerProtectionService {
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectedActions',
+		'CrawlerProtectedQueryParams',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
 		'CrawlerProtectionProtectRevisions',
@@ -100,6 +101,7 @@ class CrawlerProtectionService {
 
 		if (
 			$this->isProtectedAction( $action )
+			|| $this->hasProtectedQueryParam( $request )
 			|| ( $revisionsProtected && (
 				$type === 'revision'
 				|| $diffId > 0
@@ -111,6 +113,38 @@ class CrawlerProtectionService {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Determine whether the request carries a protected special-page query
+	 * parameter without a title naming the special page that consumes it.
+	 *
+	 * Such a request never resolves to a special page, so
+	 * SpecialPageBeforeExecute does not fire and the request is served as an
+	 * ordinary page view. MediaWiki always emits a title alongside these
+	 * parameters, so their presence without one marks the request as
+	 * crawler-generated rather than user-initiated.
+	 *
+	 * An empty or whitespace-only title (for example "title=") counts as
+	 * missing, since it does not name a special page either and MediaWiki
+	 * renders the main page for it.
+	 *
+	 * @param WebRequest $request
+	 * @return bool
+	 */
+	public function hasProtectedQueryParam( $request ): bool {
+		$title = $request->getVal( 'title' );
+		if ( $title !== null && trim( $title ) !== '' ) {
+			return false;
+		}
+
+		foreach ( $this->options->get( 'CrawlerProtectedQueryParams' ) as $param ) {
+			if ( $request->getVal( $param ) !== null ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
