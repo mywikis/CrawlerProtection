@@ -100,8 +100,12 @@ namespace MediaWiki\SpecialPage {
 
 namespace MediaWiki\User {
 	class User {
-		public function isRegistered() {
+		public function isRegistered(): bool {
 			return false;
+		}
+
+		public function getName(): string {
+			return '';
 		}
 	}
 }

@@ -51,7 +51,9 @@ jobs:
       - name: Setup Composer
         # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          # composer-merge-plugin does not merge the "config" section from composer.local.json, so set the advisory policy on the root composer.json directly
+          composer config --no-plugins policy.advisories.block false
           composer update
           composer update
       - name: Lint
@@ -96,7 +98,9 @@ jobs:
       - name: Setup Composer
         # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          # composer-merge-plugin does not merge the "config" section from composer.local.json, so set the advisory policy on the root composer.json directly
+          composer config --no-plugins policy.advisories.block false
           composer update
           composer update
       - name: Phan
@@ -137,7 +141,9 @@ jobs:
       - name: Setup Composer
         # Don't block insecure packages because MediaWiki might be using outdated dependencies, which shouldn't block the extension's pipelines from running
         run: |
-          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}},"config":{"audit":{"abandoned":"report","block-insecure":false}}}' > composer.local.json
+          echo '{"extra":{"merge-plugin":{"include":["extensions/*/composer.json","skins/*/composer.json"]}}}' > composer.local.json
+          # composer-merge-plugin does not merge the "config" section from composer.local.json, so set the advisory policy on the root composer.json directly
+          composer config --no-plugins policy.advisories.block false
           composer update
           composer update
       - name: Install MediaWiki
