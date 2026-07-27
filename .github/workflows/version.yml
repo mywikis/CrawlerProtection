@@ -18,10 +18,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || github.sha }}
       - name: Fetch pull request revision
+        id: pr_head
         if: github.event_name == 'pull_request_target'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: git fetch --no-tags origin "pull/${PR_NUMBER}/head"
+        run: |
+          git fetch --no-tags origin "pull/${PR_NUMBER}/head"
+          echo "sha=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_OUTPUT"
       - name: Check override permission
         id: override
         env:
