@@ -15,6 +15,40 @@ env:
   MW_INSTALL_PATH: ${{ github.workspace }}
 
 jobs:
+  version:
+    name: Version Bump
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Extension
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check override permission
+        id: override
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          permission=$(gh api \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --jq '.permission' \
+            "repos/${REPOSITORY}/collaborators/${ACTOR}/permission")
+          if [[ $permission == admin || $permission == maintain ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Version check overridden by ${ACTOR} (${permission})."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test version check
+        run: .github/scripts/check-version-bump.test.sh
+      - name: Check version bump
+        if: steps.override.outputs.enabled != 'true'
+        env:
+          BASE_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: .github/scripts/check-version-bump.sh "$BASE_REVISION" "$HEAD_REVISION"
+
   style:
     name: Code Style
     runs-on: ${{ matrix.os }}
