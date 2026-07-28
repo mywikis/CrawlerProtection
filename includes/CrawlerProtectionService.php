@@ -36,6 +36,10 @@ use Wikimedia\IPUtils;
  *
  * Determines whether a given request should be blocked for anonymous
  * users and delegates the actual denial to ResponseFactory.
+ *
+ * Only web requests are subject to protection. On the command line there is
+ * no crawler to guard against, and denying access there aborts maintenance
+ * scripts that re-parse pages transcluding a protected special page.
  */
 class CrawlerProtectionService {
 
@@ -54,17 +58,23 @@ class CrawlerProtectionService {
 	/** @var ResponseFactory */
 	private ResponseFactory $responseFactory;
 
+	/** @var bool */
+	private bool $cliMode;
+
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
+	 * @param bool $cliMode
 	 */
 	public function __construct(
 		ServiceOptions $options,
-		ResponseFactory $responseFactory
+		ResponseFactory $responseFactory,
+		bool $cliMode
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
 		$this->responseFactory = $responseFactory;
+		$this->cliMode = $cliMode;
 	}
 
 	/**
@@ -83,6 +93,10 @@ class CrawlerProtectionService {
 		$user,
 		$request
 	): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
 		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
 			return true;
 		}
@@ -186,6 +200,10 @@ class CrawlerProtectionService {
 		$output,
 		$user
 	): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
 		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
 			return true;
 		}

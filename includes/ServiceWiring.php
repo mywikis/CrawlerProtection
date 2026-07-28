@@ -45,7 +45,8 @@ return [
 					CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 					$services->getMainConfig()
 				),
-				$services->get( 'CrawlerProtection.ResponseFactory' )
+				$services->get( 'CrawlerProtection.ResponseFactory' ),
+				defined( 'MW_ENTRY_POINT' ) && MW_ENTRY_POINT === 'cli'
 			);
 		},
 ];
