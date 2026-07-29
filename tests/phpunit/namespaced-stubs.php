@@ -118,6 +118,35 @@ namespace MediaWiki\Request {
 	}
 }
 
+namespace MediaWiki\HookContainer {
+	class HookContainer {
+		/** @var array<string,callable[]> */
+		private array $handlers;
+
+		/**
+		 * @param array<string,callable[]> $handlers
+		 */
+		public function __construct( array $handlers = [] ) {
+			$this->handlers = $handlers;
+		}
+
+		/**
+		 * @param string $hook
+		 * @param array $args
+		 * @param array $options
+		 * @return bool
+		 */
+		public function run( string $hook, array $args = [], array $options = [] ): bool {
+			foreach ( $this->handlers[$hook] ?? [] as $handler ) {
+				if ( $handler( ...$args ) === false ) {
+					return false;
+				}
+			}
+			return true;
+		}
+	}
+}
+
 namespace MediaWiki\Title {
 	class Title {
 	}

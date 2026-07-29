@@ -58,22 +58,28 @@ class CrawlerProtectionService {
 	/** @var ResponseFactory */
 	private ResponseFactory $responseFactory;
 
+	/** @var HookRunner */
+	private HookRunner $hookRunner;
+
 	/** @var bool */
 	private bool $cliMode;
 
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
+	 * @param HookRunner $hookRunner
 	 * @param bool $cliMode
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
+		HookRunner $hookRunner,
 		bool $cliMode
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
 		$this->responseFactory = $responseFactory;
+		$this->hookRunner = $hookRunner;
 		$this->cliMode = $cliMode;
 	}
 
@@ -97,31 +103,38 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
-			return true;
+		$shouldDeny = false;
+
+		if ( !$user->isRegistered() && !$this->isIPAllowed( $user->getName() ) ) {
+			$type = $request->getVal( 'type' );
+			$action = $request->getVal( 'action' );
+			$diffId = (int)$request->getVal( 'diff' );
+			$oldId = (int)$request->getVal( 'oldid' );
+
+			// $wgCrawlerProtectionProtectRevisions independently controls whether
+			// type=revision, diff and oldid requests are blocked. This allows
+			// operators to disable history-listing protection (by removing 'history'
+			// from $wgCrawlerProtectedActions) while still blocking direct access
+			// to individual revisions and diffs, or vice versa.
+			$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
+
+			$shouldDeny = $this->isProtectedAction( $action )
+				|| $this->hasProtectedQueryParam( $request )
+				|| ( $revisionsProtected && (
+					$type === 'revision'
+					|| $diffId > 0
+					|| $oldId > 0
+				) );
 		}
 
-		$type = $request->getVal( 'type' );
-		$action = $request->getVal( 'action' );
-		$diffId = (int)$request->getVal( 'diff' );
-		$oldId = (int)$request->getVal( 'oldid' );
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			null,
+			$shouldDeny
+		);
 
-		// $wgCrawlerProtectionProtectRevisions independently controls whether
-		// type=revision, diff and oldid requests are blocked. This allows
-		// operators to disable history-listing protection (by removing 'history'
-		// from $wgCrawlerProtectedActions) while still blocking direct access
-		// to individual revisions and diffs, or vice versa.
-		$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
-
-		if (
-			$this->isProtectedAction( $action )
-			|| $this->hasProtectedQueryParam( $request )
-			|| ( $revisionsProtected && (
-				$type === 'revision'
-				|| $diffId > 0
-				|| $oldId > 0
-			) )
-		) {
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
@@ -193,22 +206,31 @@ class CrawlerProtectionService {
 	 * @param string $specialPageName The canonical special page name
 	 * @param OutputPage $output
 	 * @param User $user
+	 * @param WebRequest|null $request The current request, if available
 	 * @return bool
 	 */
 	public function checkSpecialPage(
 		string $specialPageName,
 		$output,
-		$user
+		$user,
+		$request = null
 	): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
-			return true;
-		}
+		$shouldDeny = !$user->isRegistered()
+			&& !$this->isIPAllowed( $user->getName() )
+			&& $this->isProtectedSpecialPage( $specialPageName );
 
-		if ( $this->isProtectedSpecialPage( $specialPageName ) ) {
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			$specialPageName,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
