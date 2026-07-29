@@ -177,6 +177,10 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
+		// Arrange
+		$capturedHeader = null;
+		$capturedBody = null;
+
 		$factory = $this->getMockBuilder( ResponseFactory::class )
 			->setConstructorArgs( [
 				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
@@ -189,12 +193,22 @@ class ResponseFactoryTest extends TestCase {
 			->onlyMethods( [ 'denyAccessRaw' ] )
 			->getMock();
 
-		$factory->expects( $this->once() )
-			->method( 'denyAccessRaw' )
-			->with( 'HTTP/1.0 403 Forbidden', 'Mock message' );
+		$factory->method( 'denyAccessRaw' )
+			->willReturnCallback(
+				static function ( string $header, string $message ) use ( &$capturedHeader, &$capturedBody ) {
+					$capturedHeader = $header;
+					$capturedBody = $message;
+				}
+			);
 
 		$output = $this->createMock( self::$outputPageClassName );
+
+		// Act
 		$factory->denyAccess( $output );
+
+		// Assert
+		$this->assertSame( 'HTTP/1.0 403 Forbidden', $capturedHeader );
+		$this->assertSame( 'Mock message', $capturedBody );
 	}
 
 	/**
@@ -212,6 +226,10 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
+		// Arrange
+		$capturedHeader = null;
+		$capturedBody = null;
+
 		$factory = $this->getMockBuilder( ResponseFactory::class )
 			->setConstructorArgs( [
 				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
@@ -224,12 +242,22 @@ class ResponseFactoryTest extends TestCase {
 			->onlyMethods( [ 'denyAccessRaw' ] )
 			->getMock();
 
-		$factory->expects( $this->once() )
-			->method( 'denyAccessRaw' )
-			->with( 'HTTP/1.0 418 I\'m a teapot', 'Mock message' );
+		$factory->method( 'denyAccessRaw' )
+			->willReturnCallback(
+				static function ( string $header, string $message ) use ( &$capturedHeader, &$capturedBody ) {
+					$capturedHeader = $header;
+					$capturedBody = $message;
+				}
+			);
 
 		$output = $this->createMock( self::$outputPageClassName );
+
+		// Act
 		$factory->denyAccess( $output );
+
+		// Assert
+		$this->assertSame( 'HTTP/1.0 418 I\'m a teapot', $capturedHeader );
+		$this->assertSame( 'Mock message', $capturedBody );
 	}
 
 	/**
