@@ -199,4 +199,143 @@ class HooksTest extends TestCase {
 			}
 		};
 	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecuteDelegatesToService() {
+		$user = $this->createMock( self::$userClassName );
+
+		$module = new class() {
+			public function getModuleName(): string {
+				return 'revisions';
+			}
+		};
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModule' )
+			->with( 'revisions', $user )
+			->willReturn( false );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$result = $hooks->onApiCheckCanExecute( $module, $user, $message );
+
+		$this->assertFalse( $result );
+		$this->assertNotNull( $message );
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecutePassesThroughWhenAllowed() {
+		$user = $this->createMock( self::$userClassName );
+
+		$module = new class() {
+			public function getModuleName(): string {
+				return 'query';
+			}
+		};
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModule' )
+			->with( 'query', $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$result = $hooks->onApiCheckCanExecute( $module, $user, $message );
+
+		// Returns null (no explicit false) when allowed
+		$this->assertNotFalse( $result );
+		$this->assertNull( $message );
+	}
+
+	/**
+	 * @covers ::onRestCheckCanExecute
+	 */
+	public function testOnRestCheckCanExecuteDelegatesToService() {
+		$user = $this->createMock( self::$userClassName );
+		$authority = new class( $user ) {
+			private $user;
+
+			public function __construct( $user ) {
+				$this->user = $user;
+			}
+
+			public function getUser() {
+				return $this->user;
+			}
+		};
+
+		$handler = new class( $authority ) {
+			private $authority;
+
+			public function __construct( $authority ) {
+				$this->authority = $authority;
+			}
+
+			public function getAuthority() {
+				return $this->authority;
+			}
+		};
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkRestPath' )
+			->with( '/page/Main_Page/history', $user )
+			->willReturn( false );
+
+		$hooks = new Hooks( $service );
+		$error = null;
+		$result = $hooks->onRestCheckCanExecute( null, $handler, '/page/Main_Page/history', null, $error );
+
+		$this->assertFalse( $result );
+		$this->assertNotNull( $error );
+	}
+
+	/**
+	 * @covers ::onRestCheckCanExecute
+	 */
+	public function testOnRestCheckCanExecutePassesThroughWhenAllowed() {
+		$user = $this->createMock( self::$userClassName );
+		$authority = new class( $user ) {
+			private $user;
+
+			public function __construct( $user ) {
+				$this->user = $user;
+			}
+
+			public function getUser() {
+				return $this->user;
+			}
+		};
+
+		$handler = new class( $authority ) {
+			private $authority;
+
+			public function __construct( $authority ) {
+				$this->authority = $authority;
+			}
+
+			public function getAuthority() {
+				return $this->authority;
+			}
+		};
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkRestPath' )
+			->with( '/search', $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$error = null;
+		$result = $hooks->onRestCheckCanExecute( null, $handler, '/search', null, $error );
+
+		$this->assertNotFalse( $result );
+		$this->assertNull( $error );
+	}
 }

@@ -46,7 +46,9 @@ class CrawlerProtectionService {
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectedActions',
+		'CrawlerProtectedApiModules',
 		'CrawlerProtectedQueryParams',
+		'CrawlerProtectedRestPaths',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
 		'CrawlerProtectionProtectRevisions',
@@ -214,6 +216,89 @@ class CrawlerProtectionService {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Check whether an Action API module call should be blocked.
+	 *
+	 * Returns false (= deny) when the module is in the configured
+	 * protected-modules list and the caller is anonymous.  Returns
+	 * true otherwise.
+	 *
+	 * @param string $moduleName The canonical module name (e.g. "revisions", "compare")
+	 * @param User $user
+	 * @return bool
+	 */
+	public function checkApiModule( string $moduleName, $user ): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
+		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
+			return true;
+		}
+
+		return !$this->isProtectedApiModule( $moduleName );
+	}
+
+	/**
+	 * Determine whether the given API module name is in the
+	 * configured list of protected modules.
+	 *
+	 * The comparison is case-insensitive.
+	 *
+	 * @param string $moduleName
+	 * @return bool
+	 */
+	public function isProtectedApiModule( string $moduleName ): bool {
+		$protected = array_map(
+			'strtolower',
+			$this->options->get( 'CrawlerProtectedApiModules' ) ?? []
+		);
+		return in_array( strtolower( $moduleName ), $protected, true );
+	}
+
+	/**
+	 * Check whether a REST API request should be blocked.
+	 *
+	 * Returns false (= deny) when the path matches a configured
+	 * protected pattern and the caller is anonymous.  Returns true
+	 * otherwise.
+	 *
+	 * @param string $path The request path (e.g. "/page/Main_Page/history")
+	 * @param User $user
+	 * @return bool
+	 */
+	public function checkRestPath( string $path, $user ): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
+		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
+			return true;
+		}
+
+		return !$this->isProtectedRestPath( $path );
+	}
+
+	/**
+	 * Determine whether the given REST path matches any configured
+	 * protected-path pattern.
+	 *
+	 * Each pattern is tested as a glob (fnmatch), which allows wildcards,
+	 * for example "/page/&#42;/history" or "/revision/&#42;/compare/&#42;".
+	 *
+	 * @param string $path
+	 * @return bool
+	 */
+	public function isProtectedRestPath( string $path ): bool {
+		$patterns = $this->options->get( 'CrawlerProtectedRestPaths' ) ?? [];
+		foreach ( $patterns as $pattern ) {
+			if ( fnmatch( $pattern, $path ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

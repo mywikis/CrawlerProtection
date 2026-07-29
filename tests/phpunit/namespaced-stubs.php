@@ -16,6 +16,31 @@ namespace MediaWiki\SpecialPage\Hook {
 	}
 }
 
+namespace MediaWiki\Api\Hook {
+	interface ApiCheckCanExecuteHook {
+		public function onApiCheckCanExecute( $module, $user, &$message );
+	}
+}
+
+namespace MediaWiki\Rest\Hook {
+	interface RestCheckCanExecuteHook {
+		public function onRestCheckCanExecute( $module, $handler, string $path, $request, &$error );
+	}
+}
+
+// API/REST stubs
+namespace MediaWiki\Rest {
+	class HttpException extends \RuntimeException {
+		/**
+		 * @param string $message
+		 * @param int $code HTTP status code
+		 */
+		public function __construct( string $message = '', int $code = 500 ) {
+			parent::__construct( $message, $code );
+		}
+	}
+}
+
 // ServiceOptions stub
 namespace MediaWiki\Config {
 	class ServiceOptions {
