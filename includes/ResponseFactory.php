@@ -82,7 +82,7 @@ class ResponseFactory {
 				if ( $rawText === '' ) {
 					$rawText = wfMessage( 'crawlerprotection-rawdenial-text' )
 						->inContentLanguage()
-						->text();
+						->plain();
 				}
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
@@ -103,7 +103,7 @@ class ResponseFactory {
 	protected function denyAccessWith418(): void {
 		$this->denyAccessRaw(
 			self::TEAPOT_HEADER,
-			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text()
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->plain()
 		);
 	}
 
