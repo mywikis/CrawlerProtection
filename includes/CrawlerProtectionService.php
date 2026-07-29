@@ -286,7 +286,7 @@ class CrawlerProtectionService {
 	 * protected-path pattern.
 	 *
 	 * Each pattern is tested as a glob (fnmatch), which allows wildcards,
-	 * for example "/page/&#42;/history" or "/revision/&#42;/compare/&#42;".
+	 * for example "/page/*/history" or "/revision/*/compare/*".
 	 *
 	 * @param string $path
 	 * @return bool
