@@ -13,7 +13,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/"
+            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/",
+            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\Integration\\": "tests/phpunit/integration/"
         },
         "files": [
             "tests/phpunit/stubs.php",
@@ -27,7 +28,7 @@
         ],
         "phpcs": "vendor/bin/phpcs -sp --standard=.phpcs.xml",
         "phpcbf": "vendor/bin/phpcbf --standard=.phpcs.xml",
-        "phpunit": "php ../../tests/phpunit/phpunit.php tests/phpunit/"
+        "phpunit": "php ../../tests/phpunit/phpunit.php tests/phpunit/unit/"
     },
     "config": {
         "allow-plugins": {
