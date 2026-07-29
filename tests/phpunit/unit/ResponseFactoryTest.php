@@ -58,9 +58,42 @@ class ResponseFactoryTest extends TestCase {
 			->method( 'setStatusCode' )
 			->with( 403 );
 		$output->expects( $this->once() )
+			->method( 'setRobotPolicy' )
+			->with( 'noindex,nofollow' );
+		$output->expects( $this->once() )
 			->method( 'addWikiTextAsInterface' );
 
 		$factory = $this->buildFactory();
+		$factory->denyAccess( $output );
+	}
+
+	/**
+	 * The denial must ask crawlers not to index or follow the URL.
+	 *
+	 * @covers ::denyAccessPretty
+	 */
+	public function testPrettyDenialSendsRobotsHeader() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		$factory = $this->getMockBuilder( ResponseFactory::class )
+			->setConstructorArgs( [
+				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
+					'CrawlerProtectionUse418' => false,
+					'CrawlerProtectionRawDenial' => false,
+					'CrawlerProtectionRawDenialHeader' => '',
+					'CrawlerProtectionRawDenialText' => '',
+				] )
+			] )
+			->onlyMethods( [ 'sendRobotsHeader' ] )
+			->getMock();
+
+		$factory->expects( $this->once() )->method( 'sendRobotsHeader' );
+
+		$output = $this->createMock( self::$outputPageClassName );
 		$factory->denyAccess( $output );
 	}
 

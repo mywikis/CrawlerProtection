@@ -83,6 +83,9 @@ namespace MediaWiki\Output {
 
 		public function setPageTitleMsg( $msg ) {
 		}
+
+		public function setRobotPolicy( $policy ) {
+		}
 	}
 }
 
