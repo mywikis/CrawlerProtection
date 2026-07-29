@@ -29,6 +29,7 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\User\User;
+use Psr\Log\LoggerInterface;
 use Wikimedia\IPUtils;
 
 /**
@@ -50,6 +51,7 @@ class CrawlerProtectionService {
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
 		'CrawlerProtectionProtectRevisions',
+		'CrawlerProtectionTreatTempUsersAsAnon',
 	];
 
 	/** @var ServiceOptions */
@@ -61,20 +63,48 @@ class CrawlerProtectionService {
 	/** @var bool */
 	private bool $cliMode;
 
+	/** @var LoggerInterface */
+	private LoggerInterface $logger;
+
+	/** @var string[] Normalised CrawlerProtectedActions */
+	private array $normalizedProtectedActions;
+
+	/** @var string[] Normalised CrawlerProtectedQueryParams */
+	private array $normalizedProtectedQueryParams;
+
+	/** @var string[] Normalised CrawlerProtectedSpecialPages */
+	private array $normalizedProtectedSpecialPages;
+
+	/** @var string[] Normalised and validated CrawlerProtectionAllowedIPs */
+	private array $normalizedAllowedIPs;
+
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
 	 * @param bool $cliMode
+	 * @param LoggerInterface $logger
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
-		bool $cliMode
+		bool $cliMode,
+		LoggerInterface $logger
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
 		$this->responseFactory = $responseFactory;
 		$this->cliMode = $cliMode;
+		$this->logger = $logger;
+
+		// Pre-normalise all array-valued configs at construction time so that a
+		// misconfigured scalar never fatals on array_map / foreach, and so that
+		// any warning is logged exactly once per request rather than per call.
+		$this->normalizedProtectedActions = $this->normalizeArrayConfig( 'CrawlerProtectedActions' );
+		$this->normalizedProtectedQueryParams = $this->normalizeArrayConfig( 'CrawlerProtectedQueryParams' );
+		$this->normalizedProtectedSpecialPages = $this->normalizeArrayConfig( 'CrawlerProtectedSpecialPages' );
+		$this->normalizedAllowedIPs = $this->normalizeAndValidateIPs(
+			$this->normalizeArrayConfig( 'CrawlerProtectionAllowedIPs' )
+		);
 	}
 
 	/**
@@ -97,7 +127,13 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
+		if ( $this->isUserAllowed( $user ) ) {
+			return true;
+		}
+
+		// Use the canonical client IP from WebRequest (correctly applies
+		// trusted-proxy / X-Forwarded-For handling) rather than the username.
+		if ( $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() ) ) {
 			return true;
 		}
 
@@ -152,7 +188,7 @@ class CrawlerProtectionService {
 			return false;
 		}
 
-		foreach ( $this->options->get( 'CrawlerProtectedQueryParams' ) as $param ) {
+		foreach ( $this->normalizedProtectedQueryParams as $param ) {
 			if ( $request->getVal( $param ) !== null ) {
 				return true;
 			}
@@ -178,7 +214,7 @@ class CrawlerProtectionService {
 
 		$protectedActions = array_map(
 			'strtolower',
-			$this->options->get( 'CrawlerProtectedActions' )
+			$this->normalizedProtectedActions
 		);
 
 		return in_array( strtolower( $action ), $protectedActions, true );
@@ -193,18 +229,26 @@ class CrawlerProtectionService {
 	 * @param string $specialPageName The canonical special page name
 	 * @param OutputPage $output
 	 * @param User $user
+	 * @param WebRequest $request
 	 * @return bool
 	 */
 	public function checkSpecialPage(
 		string $specialPageName,
 		$output,
-		$user
+		$user,
+		$request
 	): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
+		if ( $this->isUserAllowed( $user ) ) {
+			return true;
+		}
+
+		// Use the canonical client IP from WebRequest (correctly applies
+		// trusted-proxy / X-Forwarded-For handling) rather than the username.
+		if ( $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() ) ) {
 			return true;
 		}
 
@@ -231,8 +275,6 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	public function isProtectedSpecialPage( string $specialPageName ): bool {
-		$protectedSpecialPages = $this->options->get( 'CrawlerProtectedSpecialPages' );
-
 		// Normalize protected special pages: lowercase and strip any
 		// namespace prefix (everything up to and including the first ':').
 		$normalizedProtectedPages = array_map(
@@ -244,7 +286,7 @@ class CrawlerProtectionService {
 				}
 				return $lower;
 			},
-			$protectedSpecialPages
+			$this->normalizedProtectedSpecialPages
 		);
 
 		$name = strtolower( $specialPageName );
@@ -259,12 +301,95 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	private function isIPAllowed( string $ip ): bool {
-		$allowedIPs = $this->options->get( 'CrawlerProtectionAllowedIPs' );
+		return IPUtils::isInRanges( $ip, $this->normalizedAllowedIPs );
+	}
 
-		if ( !is_array( $allowedIPs ) ) {
-			$allowedIPs = [ $allowedIPs ];
+	/**
+	 * Determine whether the given user should be allowed through the protection
+	 * without an IP check.
+	 *
+	 * Registered users are allowed unless CrawlerProtectionTreatTempUsersAsAnon
+	 * is true and the user holds a temporary account.  Temporary accounts were
+	 * introduced in MediaWiki 1.42 (User::isTemp()); on earlier versions the
+	 * method does not exist and the guard below is a no-op.
+	 *
+	 * @param User $user
+	 * @return bool
+	 */
+	private function isUserAllowed( $user ): bool {
+		if ( !$user->isRegistered() ) {
+			return false;
 		}
 
-		return IPUtils::isInRanges( $ip, $allowedIPs );
+		// When CrawlerProtectionTreatTempUsersAsAnon is true, a temporary-account
+		// user is treated as anonymous so the rest of the protection logic applies.
+		if ( $this->options->get( 'CrawlerProtectionTreatTempUsersAsAnon' )
+			&& method_exists( $user, 'isTemp' )
+			&& $user->isTemp()
+		) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Coerce a config value to a string array, logging a warning if the raw
+	 * value is not already an array or contains non-string elements.
+	 *
+	 * @param string $configKey
+	 * @return string[]
+	 */
+	private function normalizeArrayConfig( string $configKey ): array {
+		$value = $this->options->get( $configKey );
+
+		if ( !is_array( $value ) ) {
+			$this->logger->warning(
+				'CrawlerProtection: Config {configKey} should be an array; got a scalar. ' .
+					'Treating it as a single-element array.',
+				[ 'configKey' => $configKey ]
+			);
+			$value = [ $value ];
+		}
+
+		$filtered = array_values( array_filter( $value, 'is_string' ) );
+
+		if ( count( $filtered ) !== count( $value ) ) {
+			$this->logger->warning(
+				'CrawlerProtection: Config {configKey} contains non-string entries; ' .
+					'they have been ignored.',
+				[ 'configKey' => $configKey ]
+			);
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Validate IP allowlist entries and log a warning for any entry that does
+	 * not look like a valid IP address, CIDR range, or explicit range.
+	 *
+	 * Invalid entries are kept in the returned array because
+	 * IPUtils::isInRanges() handles them gracefully (returns false), so they
+	 * do not cause errors; the warning simply makes typos discoverable.
+	 *
+	 * @param string[] $ips
+	 * @return string[]
+	 */
+	private function normalizeAndValidateIPs( array $ips ): array {
+		foreach ( $ips as $ip ) {
+			// Accept single IPs, CIDR ranges, and explicit "a - b" ranges.
+			if ( !IPUtils::isIPAddress( $ip )
+				&& !IPUtils::isValidRange( $ip )
+				&& strpos( $ip, ' - ' ) === false
+			) {
+				$this->logger->warning(
+					'CrawlerProtection: CrawlerProtectionAllowedIPs entry "{ip}" does not look like ' .
+						'a valid IP address, CIDR range, or explicit IP range.',
+					[ 'ip' => $ip ]
+				);
+			}
+		}
+		return $ips;
 	}
 }

@@ -6,6 +6,7 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * @coversDefaultClass \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService
@@ -47,6 +48,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param bool $protectRevisions
 	 * @param array $protectedQueryParams
 	 * @param bool $cliMode
+	 * @param bool $treatTempUsersAsAnon
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
@@ -56,7 +58,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = null,
 		bool $protectRevisions = true,
 		array $protectedQueryParams = [ 'target' ],
-		bool $cliMode = false
+		bool $cliMode = false,
+		bool $treatTempUsersAsAnon = false
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
@@ -66,12 +69,13 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedSpecialPages' => $protectedPages,
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
+				'CrawlerProtectionTreatTempUsersAsAnon' => $treatTempUsersAsAnon,
 			]
 		);
 
 		$responseFactory ??= $this->createMock( ResponseFactory::class );
 
-		return new CrawlerProtectionService( $options, $responseFactory, $cliMode );
+		return new CrawlerProtectionService( $options, $responseFactory, $cliMode, new NullLogger() );
 	}
 
 	// ---------------------------------------------------------------
@@ -409,7 +413,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -462,7 +465,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -529,7 +531,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -555,7 +556,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
@@ -725,6 +725,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
@@ -734,7 +736,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
+		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user, $request ) );
 	}
 
 	/**
@@ -748,6 +750,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( true );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
@@ -757,7 +761,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user, $request ) );
 	}
 
 	/**
@@ -768,6 +772,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
@@ -777,7 +783,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user, $request ) );
 	}
 
 	/**
@@ -787,6 +793,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
 
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
@@ -800,7 +808,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[ 'target' ],
 			true
 		);
-		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
 	}
 
 	// ---------------------------------------------------------------
@@ -881,9 +889,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( $ip );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( $ip );
 		$request->method( 'getVal' )->willReturnMap( [
 			[ 'type', null, 'revision' ],
 		] );
@@ -906,9 +914,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( $ip );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( $ip );
 		$request->method( 'getVal' )->willReturnMap( [
 			[ 'type', null, 'revision' ],
 		] );
@@ -945,5 +953,254 @@ class CrawlerProtectionServiceTest extends TestCase {
 			],
 			'String instead of array' => [ '1.2.3.4', '1.2.3.4' ],
 		];
+	}
+
+	// ---------------------------------------------------------------
+	// IP read from WebRequest::getIP() tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * Verify that the IP used for allowlist matching comes from $request->getIP()
+	 * and not from the (now irrelevant) username.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionUsesRequestIPNotUsername() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		// Username does NOT match the allowlist; request IP DOES.
+		// getName() must never be called for IP resolution.
+		$user->expects( $this->never() )->method( 'getName' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService( [], [ 'history' ], [ '1.2.3.4' ], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * Verify that the IP used for allowlist matching in checkSpecialPage comes
+	 * from $request->getIP().
+	 *
+	 * @covers ::checkSpecialPage
+	 */
+	public function testCheckSpecialPageUsesRequestIPNotUsername() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->expects( $this->never() )->method( 'getName' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[ 'WhatLinksHere' ], [], [ '1.2.3.4' ], $responseFactory
+		);
+		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// Temporary-account user tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = false (default), a
+	 * temporary-account user (isRegistered() = true, isTemp() = true) should
+	 * be allowed through just like any other registered user.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsTempUserWhenFlagIsFalse() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		// treatTempUsersAsAnon = false (default)
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = true, a user whose
+	 * isRegistered() returns true but isTemp() returns true should be treated
+	 * as anonymous and therefore blocked on a protected action.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksTempUserWhenFlagIsTrue() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		// Simulate a temporary-account user: registered but isTemp() = true.
+		// We create the mock with additional method 'isTemp' since the real
+		// User class only has it in MW >= 1.42.
+		$user = $this->getMockBuilder( self::$userClassName )
+			->disableOriginalConstructor()
+			->addMethods( [ 'isTemp' ] )
+			->getMock();
+		$user->method( 'isRegistered' )->willReturn( true );
+		$user->method( 'isTemp' )->willReturn( true );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		// treatTempUsersAsAnon = true
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, true
+		);
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = true, a fully registered
+	 * (non-temp) user should still be allowed through.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsRegisteredNonTempWhenFlagIsTrue() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		$user = $this->getMockBuilder( self::$userClassName )
+			->disableOriginalConstructor()
+			->addMethods( [ 'isTemp' ] )
+			->getMock();
+		$user->method( 'isRegistered' )->willReturn( true );
+		$user->method( 'isTemp' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		// treatTempUsersAsAnon = true, but user is not a temp account
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, true
+		);
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// Scalar misconfiguration tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * When CrawlerProtectedActions is set to a scalar string instead of an
+	 * array, the service should still function (no fatal) and treat the scalar
+	 * as a single-element list.
+	 *
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => 'history',
+				'CrawlerProtectedQueryParams' => [ 'target' ],
+				'CrawlerProtectedSpecialPages' => [],
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			false,
+			new NullLogger()
+		);
+
+		$this->assertTrue( $service->isProtectedAction( 'history' ) );
+		$this->assertFalse( $service->isProtectedAction( 'edit' ) );
+	}
+
+	/**
+	 * When CrawlerProtectedQueryParams is set to a scalar string instead of an
+	 * array, the service should still function and treat the scalar as a
+	 * single-element list.
+	 *
+	 * @covers ::hasProtectedQueryParam
+	 */
+	public function testHasProtectedQueryParamToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedQueryParams' => 'target',
+				'CrawlerProtectedSpecialPages' => [],
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			false,
+			new NullLogger()
+		);
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Foo' ],
+		] );
+
+		$this->assertTrue( $service->hasProtectedQueryParam( $request ) );
+	}
+
+	/**
+	 * When CrawlerProtectedSpecialPages is set to a scalar string instead of an
+	 * array, the service should still function and treat the scalar as a
+	 * single-element list.
+	 *
+	 * @covers ::isProtectedSpecialPage
+	 */
+	public function testIsProtectedSpecialPageToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedQueryParams' => [],
+				'CrawlerProtectedSpecialPages' => 'WhatLinksHere',
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			false,
+			new NullLogger()
+		);
+
+		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+		$this->assertFalse( $service->isProtectedSpecialPage( 'Search' ) );
 	}
 }
