@@ -1,5 +1,8 @@
 name: Copilot Setup Steps
 
+# This workflow exists to pre-provision the same baseline dependencies that Copilot cloud agents
+# need when running repository tasks (PHP/composer + build submodule + extension deps).
+# It is not a replacement for CI and does not run full lint/test jobs.
 on:
     workflow_dispatch:
     push:

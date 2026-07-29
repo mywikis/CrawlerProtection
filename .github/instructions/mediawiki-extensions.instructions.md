@@ -4,6 +4,11 @@ applyTo: "**/*"
 
 # MediaWiki extension guidance (repo-oriented)
 
+- This file intentionally stays concise and defers repository-specific policy to
+  `.github/copilot-instructions.md` and `crawlerprotection-*.instructions.md`.
+- For full upstream extension conventions, see:
+  - https://www.mediawiki.org/wiki/Manual:Developing_extensions
+  - https://www.mediawiki.org/wiki/Manual:Coding_conventions
 - Use dependency injection and service wiring for extension logic.
 - Keep UI/hook glue thin; put business logic in reusable services.
 - Use MediaWiki wrappers/APIs instead of direct superglobal access.
