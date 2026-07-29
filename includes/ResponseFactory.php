@@ -39,7 +39,6 @@ use MediaWiki\Output\OutputPage;
 class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
-	private const TEAPOT_BODY = 'I\'m a teapot';
 
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
@@ -79,9 +78,15 @@ class ResponseFactory {
 			if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
 				$this->denyAccessWith418();
 			} else {
+				$rawText = $this->options->get( 'CrawlerProtectionRawDenialText' );
+				if ( $rawText === '' ) {
+					$rawText = wfMessage( 'crawlerprotection-rawdenial-text' )
+						->inContentLanguage()
+						->text();
+				}
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
-					$this->options->get( 'CrawlerProtectionRawDenialText' )
+					$rawText
 				);
 			}
 		} else {
@@ -96,7 +101,10 @@ class ResponseFactory {
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessWith418(): void {
-		$this->denyAccessRaw( self::TEAPOT_HEADER, self::TEAPOT_BODY );
+		$this->denyAccessRaw(
+			self::TEAPOT_HEADER,
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text()
+		);
 	}
 
 	/**
