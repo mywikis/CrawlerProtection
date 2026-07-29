@@ -72,6 +72,8 @@ class ResponseFactory {
 	 *
 	 * @param OutputPage $output Used only for the "pretty" strategy
 	 * @return void
+	 * @suppress SecurityCheck-XSS The raw body comes from wiki configuration
+	 *  or from an interface message, both of which are trusted sources.
 	 */
 	public function denyAccess( $output ): void {
 		if ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
@@ -82,7 +84,7 @@ class ResponseFactory {
 				if ( $rawText === '' ) {
 					$rawText = wfMessage( 'crawlerprotection-rawdenial-text' )
 						->inContentLanguage()
-						->plain();
+						->text();
 				}
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
@@ -99,11 +101,13 @@ class ResponseFactory {
 	 *
 	 * @return void
 	 * @suppress PhanPluginNeverReturnMethod
+	 * @suppress SecurityCheck-XSS The body comes from an interface message,
+	 *  which is a trusted source.
 	 */
 	protected function denyAccessWith418(): void {
 		$this->denyAccessRaw(
 			self::TEAPOT_HEADER,
-			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->plain()
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text()
 		);
 	}
 
