@@ -60,8 +60,16 @@ composer phpunit     # Run unit tests
 
 ## Update Docker CI
 
+To update the `build` submodule to the latest upstream commit, run:
+
 ```bash
-git submodule update --init --remote
+cd build && git fetch origin && git checkout origin/main && cd ..
+git add build
+git commit -m "build: update docker-compose-ci submodule"
 ```
 
-See `.github/CI-SETUP.md` and `.github/DOCKER-CI-QUICKREF.md` for more details.
+Then open a PR with the updated submodule pointer.
+
+> **Note:** The `build` submodule is pinned to a specific commit for reproducibility.
+> The Makefile will check out that exact commit when you run `make`.
+> Do **not** use `--remote` when updating, as that would bypass the pin.
