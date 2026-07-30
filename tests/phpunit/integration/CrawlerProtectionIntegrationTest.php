@@ -674,20 +674,36 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			$this->makeAnonUser()
 		);
 
+		$denied = false;
 		try {
 			$api->execute();
-			$this->fail( 'An anonymous request for a protected sub-module must be denied' );
-		} catch ( \ApiUsageException $e ) {
+		} catch ( \Exception $e ) {
+			// ApiUsageException moved into the MediaWiki\Api namespace after
+			// MW 1.39, so it is recognised by the method it exposes rather
+			// than by class name.
 			$this->assertTrue(
+				method_exists( $e, 'getStatusValue' ),
+				'Expected an ApiUsageException, got ' . get_class( $e ) . ': ' . $e->getMessage()
+			);
+			$denied = true;
+			$this->assertTrue(
+				// @phan-suppress-next-line PhanUndeclaredMethod ApiUsageException only
 				$e->getStatusValue()->hasMessage( 'crawlerprotection-accessdenied-text' ),
 				'The denial must use the extension error message'
 			);
 		}
 
+		$this->assertTrue( $denied, 'An anonymous request for a protected sub-module must be denied' );
+
 		$response = $api->getRequest()->response();
-		$this->assertSame( 403, $response->getStatusCode() );
+		$this->assertSame(
+			403,
+			// @phan-suppress-next-line PhanUndeclaredMethod FauxResponse only
+			$response->getStatusCode()
+		);
 		$this->assertSame(
 			'noindex,nofollow',
+			// @phan-suppress-next-line PhanUndeclaredMethod FauxResponse only
 			$response->getHeader( 'X-Robots-Tag' ),
 			'A denied API request must tell crawlers not to re-request the URL'
 		);
