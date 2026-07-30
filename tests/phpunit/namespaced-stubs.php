@@ -16,18 +16,6 @@ namespace MediaWiki\SpecialPage\Hook {
 	}
 }
 
-namespace MediaWiki\Api\Hook {
-	interface ApiCheckCanExecuteHook {
-		public function onApiCheckCanExecute( $module, $user, &$message );
-	}
-}
-
-namespace MediaWiki\Rest\Hook {
-	interface RestCheckCanExecuteHook {
-		public function onRestCheckCanExecute( $module, $handler, string $path, $request, &$error );
-	}
-}
-
 // API/REST stubs
 namespace MediaWiki\Rest {
 	class HttpException extends \RuntimeException {
@@ -37,6 +25,45 @@ namespace MediaWiki\Rest {
 		 */
 		public function __construct( string $message = '', int $code = 500 ) {
 			parent::__construct( $message, $code );
+		}
+	}
+
+	class LocalizedHttpException extends HttpException {
+		/**
+		 * @param \Wikimedia\Message\MessageValue $messageValue
+		 * @param int $code HTTP status code
+		 */
+		public function __construct( $messageValue, int $code = 500 ) {
+			parent::__construct( $messageValue->getKey(), $code );
+		}
+	}
+}
+
+namespace Wikimedia\Message {
+	class MessageValue {
+		/** @var string */
+		private string $key;
+
+		/**
+		 * @param string $key
+		 */
+		public function __construct( string $key ) {
+			$this->key = $key;
+		}
+
+		/**
+		 * @param string $key
+		 * @return self
+		 */
+		public static function new( string $key ): self {
+			return new self( $key );
+		}
+
+		/**
+		 * @return string
+		 */
+		public function getKey(): string {
+			return $this->key;
 		}
 	}
 }
