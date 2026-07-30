@@ -379,10 +379,7 @@ class CrawlerProtectionService {
 	private function normalizeAndValidateIPs( array $ips ): array {
 		foreach ( $ips as $ip ) {
 			// Accept single IPs, CIDR ranges, and explicit "a - b" ranges.
-			if ( !IPUtils::isIPAddress( $ip )
-				&& !IPUtils::isValidRange( $ip )
-				&& strpos( $ip, ' - ' ) === false
-			) {
+			if ( !IPUtils::isIPAddress( $ip ) && !IPUtils::isValidRange( $ip ) ) {
 				$this->logger->warning(
 					'CrawlerProtection: CrawlerProtectionAllowedIPs entry "{ip}" does not look like ' .
 						'a valid IP address, CIDR range, or explicit IP range.',

@@ -78,6 +78,32 @@ class CrawlerProtectionServiceTest extends TestCase {
 		return new CrawlerProtectionService( $options, $responseFactory, $cliMode, new NullLogger() );
 	}
 
+	/**
+	 * Build a registered user mock whose isTemp() returns the given value.
+	 *
+	 * User::isTemp() only exists in MediaWiki 1.42 and later, so the method is
+	 * added to the mock when the underlying class does not define it.
+	 *
+	 * @param bool $isTemp
+	 * @return \PHPUnit\Framework\MockObject\MockObject
+	 */
+	private function newTempAwareUserMock( bool $isTemp ) {
+		$builder = $this->getMockBuilder( self::$userClassName )
+			->disableOriginalConstructor();
+
+		if ( method_exists( self::$userClassName, 'isTemp' ) ) {
+			$builder->onlyMethods( [ 'isRegistered', 'isTemp' ] );
+		} else {
+			$builder->onlyMethods( [ 'isRegistered' ] )->addMethods( [ 'isTemp' ] );
+		}
+
+		$user = $builder->getMock();
+		$user->method( 'isRegistered' )->willReturn( true );
+		$user->method( 'isTemp' )->willReturn( $isTemp );
+
+		return $user;
+	}
+
 	// ---------------------------------------------------------------
 	// checkPerformAction tests
 	// ---------------------------------------------------------------
@@ -1023,8 +1049,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 */
 	public function testCheckPerformActionAllowsTempUserWhenFlagIsFalse() {
 		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$user->method( 'isRegistered' )->willReturn( true );
+
+		// Simulate a temporary-account user: registered but isTemp() = true.
+		$user = $this->newTempAwareUserMock( true );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
@@ -1050,14 +1077,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 
 		// Simulate a temporary-account user: registered but isTemp() = true.
-		// We create the mock with additional method 'isTemp' since the real
-		// User class only has it in MW >= 1.42.
-		$user = $this->getMockBuilder( self::$userClassName )
-			->disableOriginalConstructor()
-			->addMethods( [ 'isTemp' ] )
-			->getMock();
-		$user->method( 'isRegistered' )->willReturn( true );
-		$user->method( 'isTemp' )->willReturn( true );
+		$user = $this->newTempAwareUserMock( true );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
@@ -1083,12 +1103,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	public function testCheckPerformActionAllowsRegisteredNonTempWhenFlagIsTrue() {
 		$output = $this->createMock( self::$outputPageClassName );
 
-		$user = $this->getMockBuilder( self::$userClassName )
-			->disableOriginalConstructor()
-			->addMethods( [ 'isTemp' ] )
-			->getMock();
-		$user->method( 'isRegistered' )->willReturn( true );
-		$user->method( 'isTemp' )->willReturn( false );
+		$user = $this->newTempAwareUserMock( false );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
