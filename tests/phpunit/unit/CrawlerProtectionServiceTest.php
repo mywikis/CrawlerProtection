@@ -4,9 +4,8 @@ namespace MediaWiki\Extension\CrawlerProtection\Tests;
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
-use MediaWiki\Extension\CrawlerProtection\HookRunner;
+use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
-use MediaWiki\HookContainer\HookContainer;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -81,9 +80,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$responseFactory ??= $this->createMock( ResponseFactory::class );
 
-		$hookRunner = new HookRunner( new HookContainer(
-			[ 'CrawlerProtectionShouldDeny' => $shouldDenyHandlers ]
-		) );
+		$hookRunner = new HookRunnerFake( $shouldDenyHandlers );
 
 		return new CrawlerProtectionService( $options, $responseFactory, $hookRunner, $cliMode );
 	}
@@ -1445,5 +1442,44 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ]
 		);
 		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+}
+
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound
+// phpcs:disable MediaWiki.Files.ClassMatchesFilename.NotMatch
+/**
+ * Test double for HookRunner that dispatches to plain closures.
+ *
+ * The real HookRunner needs a HookContainer, which cannot be constructed
+ * standalone, so tests use this fake to exercise the hook without one.
+ */
+class HookRunnerFake implements CrawlerProtectionShouldDenyHook {
+
+	/** @var callable[] */
+	private array $handlers;
+
+	/**
+	 * @param callable[] $handlers
+	 */
+	public function __construct( array $handlers = [] ) {
+		$this->handlers = $handlers;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function onCrawlerProtectionShouldDeny(
+		$user,
+		$request,
+		?string $specialPageName,
+		bool &$shouldDeny
+	) {
+		foreach ( $this->handlers as $handler ) {
+			if ( $handler( $user, $request, $specialPageName, $shouldDeny ) === false ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 }

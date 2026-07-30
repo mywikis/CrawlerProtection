@@ -26,6 +26,7 @@
 namespace MediaWiki\Extension\CrawlerProtection;
 
 use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\User\User;
@@ -60,8 +61,8 @@ class CrawlerProtectionService {
 	/** @var ResponseFactory */
 	private ResponseFactory $responseFactory;
 
-	/** @var HookRunner */
-	private HookRunner $hookRunner;
+	/** @var CrawlerProtectionShouldDenyHook */
+	private CrawlerProtectionShouldDenyHook $hookRunner;
 
 	/** @var bool */
 	private bool $cliMode;
@@ -69,13 +70,13 @@ class CrawlerProtectionService {
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
-	 * @param HookRunner $hookRunner
+	 * @param CrawlerProtectionShouldDenyHook $hookRunner
 	 * @param bool $cliMode
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
-		HookRunner $hookRunner,
+		CrawlerProtectionShouldDenyHook $hookRunner,
 		bool $cliMode
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
