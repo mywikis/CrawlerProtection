@@ -51,12 +51,13 @@ class HookRunner implements CrawlerProtectionShouldDenyHook {
 	public function onCrawlerProtectionShouldDeny(
 		$user,
 		$request,
+		string $entryPoint,
 		?string $specialPageName,
 		bool &$shouldDeny
 	) {
 		return $this->hookContainer->run(
 			'CrawlerProtectionShouldDeny',
-			[ $user, $request, $specialPageName, &$shouldDeny ]
+			[ $user, $request, $entryPoint, $specialPageName, &$shouldDeny ]
 		);
 	}
 }

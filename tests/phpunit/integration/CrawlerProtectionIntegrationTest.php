@@ -220,6 +220,88 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		);
 	}
 
+	/**
+	 * Verify that the ApiCheckCanExecute hook handler is registered.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 */
+	public function testApiCheckCanExecuteHookIsRegistered(): void {
+		$this->assertTrue(
+			$this->getServiceContainer()->getHookContainer()->isRegistered( 'ApiCheckCanExecute' ),
+			'ApiCheckCanExecute hook must be registered by the extension'
+		);
+	}
+
+	/**
+	 * Verify that the RestCheckCanExecute hook handler is registered.
+	 *
+	 * The hook itself only fires on MediaWiki 1.44 and later, but the handler
+	 * is registered on every supported version.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onRestCheckCanExecute
+	 */
+	public function testRestCheckCanExecuteHookIsRegistered(): void {
+		$this->assertTrue(
+			$this->getServiceContainer()->getHookContainer()->isRegistered( 'RestCheckCanExecute' ),
+			'RestCheckCanExecute hook must be registered by the extension'
+		);
+	}
+
+	/**
+	 * Hooks deliberately does not implement core's ApiCheckCanExecuteHook and
+	 * RestCheckCanExecuteHook interfaces, so PHP cannot catch signature drift
+	 * against core. Compare the handler signatures with the core interfaces
+	 * wherever those interfaces exist.
+	 *
+	 * @dataProvider provideCoreHookInterfaces
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onRestCheckCanExecute
+	 * @param string $interface Core hook interface name
+	 * @param string $method Handler method name
+	 */
+	public function testHandlerSignatureMatchesCoreInterface( string $interface, string $method ): void {
+		if ( !interface_exists( $interface ) ) {
+			$this->markTestSkipped( "$interface is not available on this MediaWiki version" );
+		}
+
+		$expected = new \ReflectionMethod( $interface, $method );
+		$actual = new \ReflectionMethod( \MediaWiki\Extension\CrawlerProtection\Hooks::class, $method );
+
+		$this->assertSame(
+			$expected->getNumberOfParameters(),
+			$actual->getNumberOfParameters(),
+			"$method must take the same number of parameters as $interface"
+		);
+
+		foreach ( $expected->getParameters() as $index => $parameter ) {
+			$this->assertSame(
+				$parameter->isPassedByReference(),
+				$actual->getParameters()[$index]->isPassedByReference(),
+				"Parameter #$index of $method must match the by-reference mode of $interface"
+			);
+		}
+	}
+
+	/**
+	 * @return array[]
+	 */
+	public static function provideCoreHookInterfaces(): array {
+		return [
+			'ApiCheckCanExecute' => [
+				'MediaWiki\\Api\\Hook\\ApiCheckCanExecuteHook',
+				'onApiCheckCanExecute',
+			],
+			'ApiCheckCanExecute (legacy namespace)' => [
+				'MediaWiki\\Hook\\ApiCheckCanExecuteHook',
+				'onApiCheckCanExecute',
+			],
+			'RestCheckCanExecute' => [
+				'MediaWiki\\Rest\\Hook\\RestCheckCanExecuteHook',
+				'onRestCheckCanExecute',
+			],
+		];
+	}
+
 	// ---------------------------------------------------------------
 	// ResponseFactory::denyAccessPretty() with real OutputPage
 	// ---------------------------------------------------------------
@@ -456,5 +538,71 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		$result = $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request );
 
 		$this->assertTrue( $result, 'checkSpecialPage must return true for registered users' );
+	}
+
+	// ---------------------------------------------------------------
+	// Action API and REST entry points
+	// ---------------------------------------------------------------
+
+	/**
+	 * An anonymous Action API request naming a protected module must be
+	 * denied.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkApiModules
+	 */
+	public function testAnonymousApiRequestForProtectedModuleIsBlocked(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+
+		$service = $this->makeWebModeService();
+
+		$this->assertFalse(
+			$service->checkApiModules(
+				[ 'query', 'revisions' ],
+				$this->makeAnonUser(),
+				$this->makeRequest( [] )
+			)
+		);
+	}
+
+	/**
+	 * A registered user must not be blocked on the Action API.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkApiModules
+	 */
+	public function testRegisteredApiRequestForProtectedModuleIsNotBlocked(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+
+		$service = $this->makeWebModeService();
+
+		$this->assertTrue(
+			$service->checkApiModules(
+				[ 'query', 'revisions' ],
+				$this->getMutableTestUser()->getUser(),
+				$this->makeRequest( [] )
+			)
+		);
+	}
+
+	/**
+	 * An anonymous REST request matching a protected path pattern must be
+	 * denied, and a non-matching path must not be.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkRestPath
+	 */
+	public function testAnonymousRestRequestForProtectedPathIsBlocked(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedRestPaths' => [ '/page/*/history' ],
+		] );
+
+		$service = $this->makeWebModeService();
+		$user = $this->makeAnonUser();
+		$request = $this->makeRequest( [] );
+
+		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/bare', $user, $request ) );
 	}
 }

@@ -33,7 +33,8 @@
         "phpcs": "vendor/bin/phpcs -sp --standard=.phpcs.xml",
         "phpcbf": "vendor/bin/phpcbf --standard=.phpcs.xml",
         "minus-x": "vendor/bin/minus-x check .",
-        "phpunit": "php ../../tests/phpunit/phpunit.php tests/phpunit/"
+        "phpunit": "php ../../tests/phpunit/phpunit.php tests/phpunit/unit/",
+        "phpunit:integration": "php ../../tests/phpunit/phpunit.php tests/phpunit/integration/"
     },
     "config": {
         "allow-plugins": {

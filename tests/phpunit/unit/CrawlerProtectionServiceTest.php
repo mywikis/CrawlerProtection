@@ -22,6 +22,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 	/** @var string */
 	private static string $webRequestClassName;
 
+	/** @var string */
+	private static string $webResponseClassName;
+
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
 
@@ -36,6 +39,10 @@ class CrawlerProtectionServiceTest extends TestCase {
 		self::$webRequestClassName = class_exists( '\MediaWiki\Request\WebRequest' )
 			? '\MediaWiki\Request\WebRequest'
 			: '\WebRequest';
+
+		self::$webResponseClassName = class_exists( '\MediaWiki\Request\WebResponse' )
+			? '\MediaWiki\Request\WebResponse'
+			: '\WebResponse';
 	}
 
 	/**
@@ -1847,8 +1854,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
 		$seen = [];
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
-			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $entryPoint, $specialPageName, $shouldDeny ];
 			$shouldDeny = false;
 		};
 
@@ -1857,7 +1864,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		);
 
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
-		$this->assertSame( [ $user, $request, null, true ], $seen );
+		$this->assertSame( [ $user, $request, 'index', null, true ], $seen );
 	}
 
 	/**
@@ -1873,7 +1880,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) {
 			$shouldDeny = true;
 		};
 
@@ -1905,8 +1912,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
 		$seen = [];
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
-			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $entryPoint, $specialPageName, $shouldDeny ];
 			$shouldDeny = true;
 		};
 
@@ -1916,7 +1923,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		);
 
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
-		$this->assertSame( [ $user, $request, null, false ], $seen );
+		$this->assertSame( [ $user, $request, 'index', null, false ], $seen );
 	}
 
 	/**
@@ -1928,7 +1935,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$request = $this->createMock( self::$webRequestClassName );
 
 		$called = false;
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$called ) {
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$called ) {
 			$called = true;
 			$shouldDeny = true;
 		};
@@ -1958,11 +1965,13 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
 		$secondCalled = false;
-		$first = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+		$first = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) {
 			$shouldDeny = false;
 			return false;
 		};
-		$second = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$secondCalled ) {
+		$second = static function (
+			$user2, $request2, $entryPoint, $specialPageName, &$shouldDeny
+		) use ( &$secondCalled ) {
 			$secondCalled = true;
 			$shouldDeny = true;
 		};
@@ -1988,8 +1997,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
 		$seen = [];
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
-			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $entryPoint, $specialPageName, $shouldDeny ];
 			$shouldDeny = false;
 		};
 
@@ -2000,7 +2009,155 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$this->assertTrue(
 			$service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request )
 		);
-		$this->assertSame( [ $user, $request, 'WhatLinksHere', true ], $seen );
+		$this->assertSame( [ $user, $request, 'index', 'WhatLinksHere', true ], $seen );
+	}
+
+	/**
+	 * The hook must run for Action API requests as well, with the "api"
+	 * entry point and no special page name.
+	 *
+	 * @covers ::checkApiModules
+	 */
+	public function testHookRunsForApiRequests() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$seen = [];
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $entryPoint, $specialPageName, $shouldDeny ];
+			$shouldDeny = false;
+		};
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ], [], false, [ $handler ]
+		);
+
+		$this->assertTrue( $service->checkApiModules( [ 'query', 'revisions' ], $user, $request ) );
+		$this->assertSame( [ $user, $request, 'api', null, true ], $seen );
+	}
+
+	/**
+	 * The hook must run for REST requests as well, with the "rest" entry
+	 * point and no special page name.
+	 *
+	 * @covers ::checkRestPath
+	 */
+	public function testHookRunsForRestRequests() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$seen = [];
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $entryPoint, $specialPageName, $shouldDeny ];
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ], false, [ $handler ]
+		);
+
+		$this->assertFalse( $service->checkRestPath( '/search', $user, $request ) );
+		$this->assertSame( [ $user, $request, 'rest', null, false ], $seen );
+	}
+
+	// ---------------------------------------------------------------
+	// API and REST denial headers
+	// ---------------------------------------------------------------
+
+	/**
+	 * A denied Action API request must be marked with HTTP 403, because core
+	 * answers an ApiCheckCanExecute veto with "200 OK" otherwise.
+	 *
+	 * @covers ::checkApiModules
+	 */
+	public function testDeniedApiRequestIsMarkedWith403() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$response = $this->createMock( self::$webResponseClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'response' )->willReturn( $response );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )
+			->method( 'markDenied' )
+			->with( $response, 403 );
+
+		$service = $this->buildService(
+			[], [], [], $responseFactory, true, [], false, [ 'revisions' ]
+		);
+
+		$this->assertFalse( $service->checkApiModules( [ 'query', 'revisions' ], $user, $request ) );
+	}
+
+	/**
+	 * An allowed Action API request must not touch the response headers.
+	 *
+	 * @covers ::checkApiModules
+	 */
+	public function testAllowedApiRequestIsNotMarked() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'markDenied' );
+
+		$service = $this->buildService(
+			[], [], [], $responseFactory, true, [], false, [ 'revisions' ]
+		);
+
+		$this->assertTrue( $service->checkApiModules( [ 'query', 'links' ], $user, $request ) );
+	}
+
+	/**
+	 * A denied REST request gets its status from the LocalizedHttpException
+	 * raised by the hook handler, so only the robot directive is added.
+	 *
+	 * @covers ::checkRestPath
+	 */
+	public function testDeniedRestRequestIsMarkedWithoutStatusCode() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$response = $this->createMock( self::$webResponseClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'response' )->willReturn( $response );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )
+			->method( 'markDenied' )
+			->with( $response );
+
+		$service = $this->buildService(
+			[], [], [], $responseFactory, true, [], false, [], [ '/page/*/history' ]
+		);
+
+		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
+	}
+
+	/**
+	 * Without a request there is no response to mark, but the denial itself
+	 * must still take effect.
+	 *
+	 * @covers ::checkApiModules
+	 */
+	public function testDeniedApiRequestWithoutRequestMarksNothing() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )
+			->method( 'markDenied' )
+			->with( null, 403 );
+
+		$service = $this->buildService(
+			[], [], [], $responseFactory, true, [], false, [ 'revisions' ]
+		);
+
+		$this->assertFalse( $service->checkApiModules( [ 'revisions' ], $user ) );
 	}
 
 	/**
@@ -2015,7 +2172,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+		$handler = static function ( $user2, $request2, $entryPoint, $specialPageName, &$shouldDeny ) {
 			$shouldDeny = true;
 		};
 
@@ -2053,11 +2210,12 @@ class HookRunnerFake implements CrawlerProtectionShouldDenyHook {
 	public function onCrawlerProtectionShouldDeny(
 		$user,
 		$request,
+		string $entryPoint,
 		?string $specialPageName,
 		bool &$shouldDeny
 	) {
 		foreach ( $this->handlers as $handler ) {
-			if ( $handler( $user, $request, $specialPageName, $shouldDeny ) === false ) {
+			if ( $handler( $user, $request, $entryPoint, $specialPageName, $shouldDeny ) === false ) {
 				return false;
 			}
 		}

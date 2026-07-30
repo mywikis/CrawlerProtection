@@ -40,7 +40,7 @@ class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
 
-	/** Robot directive sent on the pretty denial page */
+	/** Robot directive sent on every denial response */
 	private const ROBOT_POLICY = 'noindex,nofollow';
 
 	/** @var string[] List of constructor options this class accepts */
@@ -117,6 +117,10 @@ class ResponseFactory {
 	/**
 	 * Output a raw HTTP response and halt.
 	 *
+	 * The robot directive is sent here as well as on the pretty denial page,
+	 * so that all three denial strategies tell well-behaved crawlers not to
+	 * re-request the URL.
+	 *
 	 * @param string $header
 	 * @param string $message
 	 * @return void
@@ -124,7 +128,35 @@ class ResponseFactory {
 	 */
 	protected function denyAccessRaw( string $header, string $message ): void {
 		header( $header );
+		header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		die( $message );
+	}
+
+	/**
+	 * Mark a denial that is not rendered through OutputPage.
+	 *
+	 * Used for the Action API and REST entry points, which produce their own
+	 * error body. Core's ApiCheckCanExecute denial path calls
+	 * ApiBase::dieWithError() without an HTTP code, which would otherwise
+	 * return "200 OK" with an error body and nothing telling the crawler to
+	 * stop, so the status code is set here.
+	 *
+	 * @param mixed $response WebResponse to write headers to, or null when the
+	 *  entry point cannot supply one.  WebResponse moved between namespaces
+	 *  across supported releases, hence the loose type.
+	 * @param int|null $statusCode HTTP status to set, or null to leave it alone
+	 * @return void
+	 */
+	public function markDenied( $response, ?int $statusCode = null ): void {
+		if ( $response === null ) {
+			return;
+		}
+
+		if ( $statusCode !== null ) {
+			$response->statusHeader( $statusCode );
+		}
+
+		$response->header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 	}
 
 	/**

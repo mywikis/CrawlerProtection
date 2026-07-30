@@ -244,6 +244,10 @@ class ResponseFactoryTest extends TestCase {
 
 		// Assert
 		$this->assertSame( 'HTTP/1.0 403 Forbidden', $capturedHeader );
+		// The empty config value must not reach denyAccessRaw(); under the
+		// stub runner every message resolves to the same text, so the
+		// non-empty assertion is what pins the fallback there.
+		$this->assertNotSame( '', $capturedBody );
 		$this->assertSame(
 			wfMessage( 'crawlerprotection-rawdenial-text' )->inContentLanguage()->text(),
 			$capturedBody
@@ -290,10 +294,54 @@ class ResponseFactoryTest extends TestCase {
 
 		// Assert
 		$this->assertSame( 'HTTP/1.0 418 I\'m a teapot', $capturedHeader );
+		$this->assertNotSame( '', $capturedBody );
 		$this->assertSame(
 			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text(),
 			$capturedBody
 		);
+	}
+
+	/**
+	 * Denials that are not rendered through OutputPage (Action API and REST)
+	 * must be marked noindex,nofollow, and the API path must also carry an
+	 * explicit HTTP status.
+	 *
+	 * @covers ::markDenied
+	 */
+	public function testMarkDeniedSendsStatusAndRobotsHeader() {
+		$response = $this->createMock( self::$webResponseClassName );
+		$response->expects( $this->once() )->method( 'statusHeader' )->with( 403 );
+		$response->expects( $this->once() )
+			->method( 'header' )
+			->with( 'X-Robots-Tag: noindex,nofollow' );
+
+		$this->buildFactory()->markDenied( $response, 403 );
+	}
+
+	/**
+	 * Without a status code only the robot directive is sent, for callers
+	 * whose status is already set elsewhere (REST).
+	 *
+	 * @covers ::markDenied
+	 */
+	public function testMarkDeniedWithoutStatusCodeOnlySendsRobotsHeader() {
+		$response = $this->createMock( self::$webResponseClassName );
+		$response->expects( $this->never() )->method( 'statusHeader' );
+		$response->expects( $this->once() )
+			->method( 'header' )
+			->with( 'X-Robots-Tag: noindex,nofollow' );
+
+		$this->buildFactory()->markDenied( $response );
+	}
+
+	/**
+	 * A null response (entry point without one) must be tolerated.
+	 *
+	 * @covers ::markDenied
+	 */
+	public function testMarkDeniedToleratesNullResponse() {
+		$this->buildFactory()->markDenied( null, 403 );
+		$this->addToAssertionCount( 1 );
 	}
 
 	/**
