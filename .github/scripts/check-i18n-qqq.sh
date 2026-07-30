@@ -1,29 +1,71 @@
 #!/usr/bin/env bash
-# Check that every message key in i18n/en.json has a corresponding
-# documentation entry in i18n/qqq.json.  Exits with code 1 when any
-# keys are missing so that CI can enforce the MediaWiki "MUST" requirement.
+# Check that i18n/en.json and i18n/qqq.json describe the same set of message
+# keys: every message must be documented, and qqq must not document messages
+# that no longer exist.  Exits with code 1 when the two sets differ so that CI
+# can enforce the MediaWiki "MUST" requirement.
 
 set -euo pipefail
 
 EXTENSION_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-python3 - "$EXTENSION_ROOT/i18n/en.json" "$EXTENSION_ROOT/i18n/qqq.json" << 'PYTHON'
-import json, sys
+php -- "$EXTENSION_ROOT/i18n/en.json" "$EXTENSION_ROOT/i18n/qqq.json" << 'PHP'
+<?php
+/**
+ * @param string $path
+ * @return string[]
+ */
+function crawlerProtectionMessageKeys( string $path ): array {
+	$contents = file_get_contents( $path );
+	if ( $contents === false ) {
+		fwrite( STDERR, "ERROR: Unable to read $path\n" );
+		exit( 1 );
+	}
 
-en_path, qqq_path = sys.argv[1], sys.argv[2]
+	$data = json_decode( $contents, true );
+	if ( !is_array( $data ) ) {
+		fwrite( STDERR, "ERROR: $path is not valid JSON\n" );
+		exit( 1 );
+	}
 
-with open(en_path, encoding='utf-8') as f:
-    en_keys = {k for k in json.load(f) if k != '@metadata'}
+	$keys = array_keys( $data );
+	return array_values( array_filter(
+		$keys,
+		static function ( $key ) {
+			return $key !== '@metadata';
+		}
+	) );
+}
 
-with open(qqq_path, encoding='utf-8') as f:
-    qqq_keys = {k for k in json.load(f) if k != '@metadata'}
+[ , $enPath, $qqqPath ] = $argv;
 
-missing = en_keys - qqq_keys
-if missing:
-    print("ERROR: Keys present in en.json but missing from qqq.json:")
-    for key in sorted(missing):
-        print(f"  - {key}")
-    sys.exit(1)
+$enKeys = crawlerProtectionMessageKeys( $enPath );
+$qqqKeys = crawlerProtectionMessageKeys( $qqqPath );
 
-print(f"OK: All {len(en_keys)} message key(s) from en.json are documented in qqq.json.")
-PYTHON
+$status = 0;
+
+$missing = array_diff( $enKeys, $qqqKeys );
+if ( $missing ) {
+	sort( $missing );
+	echo "ERROR: Keys present in en.json but missing from qqq.json:\n";
+	foreach ( $missing as $key ) {
+		echo "  - $key\n";
+	}
+	$status = 1;
+}
+
+$orphaned = array_diff( $qqqKeys, $enKeys );
+if ( $orphaned ) {
+	sort( $orphaned );
+	echo "ERROR: Keys documented in qqq.json but absent from en.json:\n";
+	foreach ( $orphaned as $key ) {
+		echo "  - $key\n";
+	}
+	$status = 1;
+}
+
+if ( $status === 0 ) {
+	printf( "OK: All %d message key(s) from en.json are documented in qqq.json.\n", count( $enKeys ) );
+}
+
+exit( $status );
+PHP

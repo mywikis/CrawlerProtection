@@ -172,6 +172,7 @@ class CrawlerProtectionService {
 		$this->hookRunner->onCrawlerProtectionShouldDeny(
 			$user,
 			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_INDEX,
 			null,
 			$shouldDeny
 		);
@@ -268,6 +269,7 @@ class CrawlerProtectionService {
 		$this->hookRunner->onCrawlerProtectionShouldDeny(
 			$user,
 			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_INDEX,
 			$specialPageName,
 			$shouldDeny
 		);
@@ -317,14 +319,34 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) || $this->isRequestIPAllowed( $request ) ) {
-			return true;
+		$shouldDeny = false;
+
+		if ( !$this->isUserAllowed( $user ) && !$this->isRequestIPAllowed( $request ) ) {
+			foreach ( $moduleNames as $moduleName ) {
+				if ( $this->isProtectedApiModule( $moduleName ) ) {
+					$shouldDeny = true;
+					break;
+				}
+			}
 		}
 
-		foreach ( $moduleNames as $moduleName ) {
-			if ( $this->isProtectedApiModule( $moduleName ) ) {
-				return false;
-			}
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_API,
+			null,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
+			// Core denies an ApiCheckCanExecute veto with dieWithError() and no
+			// HTTP code, which would answer "200 OK" with an error body, so the
+			// status and the robot directive are set here.
+			$this->responseFactory->markDenied(
+				$request !== null ? $request->response() : null,
+				403
+			);
+			return false;
 		}
 
 		return true;
@@ -365,11 +387,28 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) || $this->isRequestIPAllowed( $request ) ) {
-			return true;
+		$shouldDeny = !$this->isUserAllowed( $user )
+			&& !$this->isRequestIPAllowed( $request )
+			&& $this->isProtectedRestPath( $path );
+
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_REST,
+			null,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
+			// The 403 status comes from the LocalizedHttpException raised by the
+			// hook handler; only the robot directive is added here.
+			$this->responseFactory->markDenied(
+				$request !== null ? $request->response() : null
+			);
+			return false;
 		}
 
-		return !$this->isProtectedRestPath( $path );
+		return true;
 	}
 
 	/**
@@ -386,6 +425,20 @@ class CrawlerProtectionService {
 	 */
 	public function isProtectedRestPath( string $path ): bool {
 		$patterns = $this->normalizedProtectedRestPaths;
+		if ( $patterns === [] ) {
+			return false;
+		}
+
+		// fnmatch() is unavailable on a handful of exotic PHP builds; without it
+		// no pattern can be evaluated, so nothing is treated as protected.
+		if ( !function_exists( 'fnmatch' ) ) {
+			$this->logger->warning(
+				'CrawlerProtection: fnmatch() is unavailable, so ' .
+					'CrawlerProtectedRestPaths cannot be evaluated.'
+			);
+			return false;
+		}
+
 		foreach ( $patterns as $pattern ) {
 			if ( fnmatch( $pattern, $path, FNM_PATHNAME ) ) {
 				return true;
@@ -552,7 +605,9 @@ class CrawlerProtectionService {
 	private function normalizeArrayConfig( string $configKey ): array {
 		$value = $this->options->get( $configKey );
 
-		if ( !is_array( $value ) ) {
+		$wasScalar = !is_array( $value );
+
+		if ( $wasScalar ) {
 			$this->logger->warning(
 				'CrawlerProtection: Config {configKey} should be an array; got a scalar. ' .
 					'Treating it as a single-element array.',
@@ -563,7 +618,9 @@ class CrawlerProtectionService {
 
 		$filtered = array_values( array_filter( $value, 'is_string' ) );
 
-		if ( count( $filtered ) !== count( $value ) ) {
+		// A non-string scalar has already been reported above; warning again
+		// about the same value would be noise.
+		if ( !$wasScalar && count( $filtered ) !== count( $value ) ) {
 			$this->logger->warning(
 				'CrawlerProtection: Config {configKey} contains non-string entries; ' .
 					'they have been ignored.',

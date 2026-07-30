@@ -81,9 +81,11 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   single IPv4/IPv6 addresses (`'1.2.3.4'`, `'2001:db8::1'`), CIDR notation
   (`'1.2.3.0/24'`, `'2001:db8::/32'`), and explicit ranges
   (`'1.2.3.1 - 1.2.3.10'`). The client IP is resolved via `WebRequest::getIP()`,
-  which correctly handles trusted-proxy and `X-Forwarded-For` headers consistent
-  with the rest of MediaWiki. The same resolution is used for `index.php`,
-  `api.php` and `rest.php` requests.
+  which handles trusted proxies and `X-Forwarded-For` exactly as the rest of
+  MediaWiki does - which also means that an unregistered reverse proxy makes it
+  report the proxy address; see
+  [Wikis behind a reverse proxy](#wikis-behind-a-reverse-proxy) below. The same
+  resolution is used for `index.php`, `api.php` and `rest.php` requests.
 * `$wgCrawlerProtectionTreatTempUsersAsAnon` - when `true`, users with
   [temporary accounts](https://www.mediawiki.org/wiki/Help:Temporary_accounts)
   (`$wgAutoCreateTempUser`, available since MediaWiki 1.42) are treated as
@@ -97,9 +99,11 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   [Wikis behind a reverse proxy](#wikis-behind-a-reverse-proxy) below; only
   enable this after reading that section.
 
-The pretty denial page carries an `X-Robots-Tag: noindex,nofollow` header and
-the same robot policy as a `<meta>` tag, so that well-behaved crawlers stop
-re-requesting denied URLs.
+Every denial carries an `X-Robots-Tag: noindex,nofollow` header - the pretty
+denial page, the raw denial and the 418 response alike - and the pretty page
+repeats the same robot policy as a `<meta>` tag, so that well-behaved crawlers
+stop re-requesting denied URLs. Denied Action API requests are answered with
+HTTP 403, as are denied REST API requests.
 
 ## Wikis behind a reverse proxy
 
@@ -136,9 +140,14 @@ been sent by the client. Nothing else in MediaWiki is affected, and the header
 can never cause a request to be denied - only allowlisted.
 
 **Only enable this if every request reaches the wiki through exactly one
-reverse proxy that sets or appends `X-Forwarded-For`.** If the web server is
-also reachable directly, or if there are several proxy hops, a client can
-forge the header and bypass protection by claiming an allowlisted address.
+reverse proxy that unconditionally sets or appends `X-Forwarded-For`.** If the
+web server is also reachable directly, or if there are several proxy hops, a
+client can forge the header and bypass protection by claiming an allowlisted
+address. The same applies when the proxy only fills the header in when it is
+absent - HAProxy's `option forwardfor if-none`, for example - because a
+client-supplied value then survives as the only entry in the chain. Configure
+the proxy to always overwrite the header (HAProxy: plain `option forwardfor`,
+nginx: `proxy_set_header X-Forwarded-For $remote_addr`).
 
 # Hooks
 
@@ -152,29 +161,31 @@ allowlists, ...) without patching this extension.
 Parameters:
 
 * `User $user` - the user making the request.
-* `WebRequest $request` - the current request.
+* `WebRequest|null $request` - the current request, or `null` when the entry
+  point cannot supply one.
+* `string $entryPoint` - the entry point the request arrived through: `'index'`
+  for `index.php`, `'api'` for `api.php` or `'rest'` for `rest.php`.
 * `string|null $specialPageName` - canonical name of the special page being
-  executed, or `null` if the request is not a special page view.
+  executed, or `null` if the request is not a special page view. Always `null`
+  for the `api` and `rest` entry points.
 * `bool &$shouldDeny` - whether the request will be denied. Set it to `true` to
   deny a request that would otherwise be allowed, or to `false` to allow a
   request that would otherwise be denied.
 
 Return `false` to stop other handlers from running; the value of `$shouldDeny`
 at that point is still honoured. The hook runs for every web request that
-reaches CrawlerProtection (but not on the command line), including requests by
-registered users and requests that touch no protected resource, so handlers
-must inspect `$shouldDeny` and the request themselves rather than assuming a
-denial is pending. It does not run for Action API or REST API requests, which
-are governed solely by `$wgCrawlerProtectedApiModules` and
-`$wgCrawlerProtectedRestPaths`.
+reaches CrawlerProtection at any of its entry points (but not on the command
+line), including requests by registered users and requests that touch no
+protected resource, so handlers must inspect `$shouldDeny` and the request
+themselves rather than assuming a denial is pending.
 
 Example, allowing anonymous access when a request carries a secret header:
 
 ```php
 $wgHooks['CrawlerProtectionShouldDeny'][] = static function (
-	$user, $request, $specialPageName, &$shouldDeny
+	$user, $request, $entryPoint, $specialPageName, &$shouldDeny
 ) {
-	if ( $shouldDeny && $request->getHeader( 'X-My-Crawler-Token' ) === $secret ) {
+	if ( $shouldDeny && $request && $request->getHeader( 'X-My-Crawler-Token' ) === $secret ) {
 		$shouldDeny = false;
 	}
 };

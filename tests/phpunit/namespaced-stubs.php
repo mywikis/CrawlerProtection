@@ -207,6 +207,12 @@ namespace MediaWiki\Request {
 		 */
 		public function header( $string, $replace = true, $http_response_code = null ) {
 		}
+
+		/**
+		 * @param int $code
+		 */
+		public function statusHeader( $code ) {
+		}
 	}
 }
 
