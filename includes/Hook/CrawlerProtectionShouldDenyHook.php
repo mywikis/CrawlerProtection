@@ -53,8 +53,7 @@ interface CrawlerProtectionShouldDenyHook {
 	 * @since 1.7.0
 	 *
 	 * @param \MediaWiki\User\User $user The user making the request
-	 * @param \MediaWiki\Request\WebRequest|null $request The current request,
-	 *   or null if it is not available
+	 * @param \MediaWiki\Request\WebRequest $request The current request
 	 * @param string|null $specialPageName Canonical name of the special page
 	 *   being executed, or null if the request is not a special page view
 	 * @param bool &$shouldDeny Whether the request will be denied; modify to

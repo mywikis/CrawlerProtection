@@ -76,6 +76,20 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   `die();` with
   [418 I'm a teapot](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/418)
   code (default: `false`)
+* `$wgCrawlerProtectionAllowedIPs` - array of IP addresses or ranges that are
+  always allowed through, even for anonymous requests (default: `[]`). Supports
+  single IPv4/IPv6 addresses (`'1.2.3.4'`, `'2001:db8::1'`), CIDR notation
+  (`'1.2.3.0/24'`, `'2001:db8::/32'`), and explicit ranges
+  (`'1.2.3.1 - 1.2.3.10'`). The client IP is resolved via `WebRequest::getIP()`,
+  which correctly handles trusted-proxy and `X-Forwarded-For` headers consistent
+  with the rest of MediaWiki.
+* `$wgCrawlerProtectionTreatTempUsersAsAnon` - when `true`, users with
+  [temporary accounts](https://www.mediawiki.org/wiki/Help:Temporary_accounts)
+  (`$wgAutoCreateTempUser`, available since MediaWiki 1.42) are treated as
+  anonymous and subject to protection like any other non-logged-in visitor.
+  When `false` (default), temporary-account users are treated as registered
+  users and bypass all protection checks. Set to `true` if you do not want
+  crawlers that receive a temporary account to bypass protection.
 
 # Hooks
 
@@ -89,8 +103,7 @@ allowlists, ...) without patching this extension.
 Parameters:
 
 * `User $user` - the user making the request.
-* `WebRequest|null $request` - the current request, or `null` if it is not
-  available.
+* `WebRequest $request` - the current request.
 * `string|null $specialPageName` - canonical name of the special page being
   executed, or `null` if the request is not a special page view.
 * `bool &$shouldDeny` - whether the request will be denied. Set it to `true` to
@@ -112,7 +125,7 @@ Example, allowing anonymous access when a request carries a secret header:
 $wgHooks['CrawlerProtectionShouldDeny'][] = static function (
 	$user, $request, $specialPageName, &$shouldDeny
 ) {
-	if ( $shouldDeny && $request && $request->getHeader( 'X-My-Crawler-Token' ) === $secret ) {
+	if ( $shouldDeny && $request->getHeader( 'X-My-Crawler-Token' ) === $secret ) {
 		$shouldDeny = false;
 	}
 };

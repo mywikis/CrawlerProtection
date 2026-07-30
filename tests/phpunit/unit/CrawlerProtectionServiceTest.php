@@ -7,6 +7,7 @@ use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
 use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * @coversDefaultClass \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService
@@ -50,6 +51,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param bool $cliMode
 	 * @param array $protectedApiModules
 	 * @param array $protectedRestPaths
+	 * @param bool $treatTempUsersAsAnon
 	 * @param callable[] $shouldDenyHandlers Handlers for CrawlerProtectionShouldDeny
 	 * @return CrawlerProtectionService
 	 */
@@ -63,6 +65,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		bool $cliMode = false,
 		array $protectedApiModules = [],
 		array $protectedRestPaths = [],
+		bool $treatTempUsersAsAnon = false,
 		array $shouldDenyHandlers = []
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
@@ -75,6 +78,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedSpecialPages' => $protectedPages,
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
+				'CrawlerProtectionTreatTempUsersAsAnon' => $treatTempUsersAsAnon,
 			]
 		);
 
@@ -82,7 +86,39 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$hookRunner = new HookRunnerFake( $shouldDenyHandlers );
 
-		return new CrawlerProtectionService( $options, $responseFactory, $hookRunner, $cliMode );
+		return new CrawlerProtectionService(
+			$options,
+			$responseFactory,
+			$hookRunner,
+			$cliMode,
+			new NullLogger()
+		);
+	}
+
+	/**
+	 * Build a registered user mock whose isTemp() returns the given value.
+	 *
+	 * User::isTemp() only exists in MediaWiki 1.42 and later, so the method is
+	 * added to the mock when the underlying class does not define it.
+	 *
+	 * @param bool $isTemp
+	 * @return \PHPUnit\Framework\MockObject\MockObject
+	 */
+	private function newTempAwareUserMock( bool $isTemp ) {
+		$builder = $this->getMockBuilder( self::$userClassName )
+			->disableOriginalConstructor();
+
+		if ( method_exists( self::$userClassName, 'isTemp' ) ) {
+			$builder->onlyMethods( [ 'isRegistered', 'isTemp' ] );
+		} else {
+			$builder->onlyMethods( [ 'isRegistered' ] )->addMethods( [ 'isTemp' ] );
+		}
+
+		$user = $builder->getMock();
+		$user->method( 'isRegistered' )->willReturn( true );
+		$user->method( 'isTemp' )->willReturn( $isTemp );
+
+		return $user;
 	}
 
 	// ---------------------------------------------------------------
@@ -420,7 +456,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -473,7 +508,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -540,7 +574,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( $getValMap );
@@ -566,7 +599,6 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '127.0.0.1' );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
@@ -736,6 +768,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
@@ -745,7 +779,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user ) );
+		$this->assertFalse( $service->checkSpecialPage( $specialPageName, $output, $user, $request ) );
 	}
 
 	/**
@@ -759,6 +793,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( true );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
@@ -768,7 +804,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( $specialPageName, $output, $user, $request ) );
 	}
 
 	/**
@@ -779,6 +815,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
 
+		$request = $this->createMock( self::$webRequestClassName );
+
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
@@ -788,7 +826,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[],
 			$responseFactory
 		);
-		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( 'Search', $output, $user, $request ) );
 	}
 
 	/**
@@ -798,6 +836,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
 
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
@@ -811,7 +851,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[ 'target' ],
 			true
 		);
-		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user ) );
+		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
 	}
 
 	// ---------------------------------------------------------------
@@ -892,9 +932,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( $ip );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( $ip );
 		$request->method( 'getVal' )->willReturnMap( [
 			[ 'type', null, 'revision' ],
 		] );
@@ -917,9 +957,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( $ip );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( $ip );
 		$request->method( 'getVal' )->willReturnMap( [
 			[ 'type', null, 'revision' ],
 		] );
@@ -959,168 +999,250 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	// ---------------------------------------------------------------
-	// CrawlerProtectionShouldDeny hook tests
+	// IP read from WebRequest::getIP() tests
 	// ---------------------------------------------------------------
 
 	/**
+	 * Verify that the IP used for allowlist matching comes from $request->getIP()
+	 * and not from the (now irrelevant) username.
+	 *
 	 * @covers ::checkPerformAction
 	 */
-	public function testHookCanAllowOtherwiseDeniedPerformAction() {
+	public function testCheckPerformActionUsesRequestIPNotUsername() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
+		// Username does NOT match the allowlist; request IP DOES.
+		// getName() must never be called for IP resolution.
+		$user->expects( $this->never() )->method( 'getName' );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
 		$request->method( 'getVal' )->willReturnMap( [
-			[ 'action', null, 'history' ],
+			[ 'type', null, 'revision' ],
 		] );
 
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$seen = [];
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
-			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
-			$shouldDeny = false;
-		};
-
-		$service = $this->buildService(
-			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], [ $handler ]
-		);
-
+		$service = $this->buildService( [], [ 'history' ], [ '1.2.3.4' ], $responseFactory );
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
-		$this->assertSame( [ $user, $request, null, true ], $seen );
 	}
 
 	/**
-	 * @covers ::checkPerformAction
+	 * Verify that the IP used for allowlist matching in checkSpecialPage comes
+	 * from $request->getIP().
+	 *
+	 * @covers ::checkSpecialPage
 	 */
-	public function testHookCanDenyOtherwiseAllowedPerformAction() {
+	public function testCheckSpecialPageUsesRequestIPNotUsername() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
-		$user->method( 'isRegistered' )->willReturn( true );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->expects( $this->never() )->method( 'getName' );
 
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[ 'WhatLinksHere' ], [], [ '1.2.3.4' ], $responseFactory
+		);
+		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// Temporary-account user tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = false (default), a
+	 * temporary-account user (isRegistered() = true, isTemp() = true) should
+	 * be allowed through just like any other registered user.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionAllowsTempUserWhenFlagIsFalse() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		// Simulate a temporary-account user: registered but isTemp() = true.
+		$user = $this->newTempAwareUserMock( true );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		// treatTempUsersAsAnon = false (default)
+		$service = $this->buildService( [], [ 'history' ], [], $responseFactory );
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = true, a user whose
+	 * isRegistered() returns true but isTemp() returns true should be treated
+	 * as anonymous and therefore blocked on a protected action.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testCheckPerformActionBlocksTempUserWhenFlagIsTrue() {
+		$output = $this->createMock( self::$outputPageClassName );
+
+		// Simulate a temporary-account user: registered but isTemp() = true.
+		$user = $this->newTempAwareUserMock( true );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
 
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
 
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
-			$shouldDeny = true;
-		};
-
+		// treatTempUsersAsAnon = true
 		$service = $this->buildService(
-			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], [ $handler ]
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], true
 		);
-
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
 
 	/**
+	 * With CrawlerProtectionTreatTempUsersAsAnon = true, a fully registered
+	 * (non-temp) user should still be allowed through.
+	 *
 	 * @covers ::checkPerformAction
 	 */
-	public function testHookIsNotRunInCliMode() {
+	public function testCheckPerformActionAllowsRegisteredNonTempWhenFlagIsTrue() {
 		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$request = $this->createMock( self::$webRequestClassName );
 
-		$called = false;
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$called ) {
-			$called = true;
-			$shouldDeny = true;
-		};
-
-		$service = $this->buildService(
-			[], [ 'history' ], [], null, true, [ 'target' ], true, [], [], [ $handler ]
-		);
-
-		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
-		$this->assertFalse( $called );
-	}
-
-	/**
-	 * @covers ::checkPerformAction
-	 */
-	public function testHookAbortReturnValueKeepsDecision() {
-		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$user->method( 'isRegistered' )->willReturn( false );
+		$user = $this->newTempAwareUserMock( false );
 
 		$request = $this->createMock( self::$webRequestClassName );
 		$request->method( 'getVal' )->willReturnMap( [
-			[ 'action', null, 'history' ],
+			[ 'type', null, 'revision' ],
 		] );
 
 		$responseFactory = $this->createMock( ResponseFactory::class );
 		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
 
-		$secondCalled = false;
-		$first = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
-			$shouldDeny = false;
-			return false;
-		};
-		$second = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$secondCalled ) {
-			$secondCalled = true;
-			$shouldDeny = true;
-		};
-
+		// treatTempUsersAsAnon = true, but user is not a temp account
 		$service = $this->buildService(
-			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], [ $first, $second ]
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], true
 		);
-
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
-		$this->assertFalse( $secondCalled );
+	}
+
+	// ---------------------------------------------------------------
+	// Scalar misconfiguration tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * When CrawlerProtectedActions is set to a scalar string instead of an
+	 * array, the service should still function (no fatal) and treat the scalar
+	 * as a single-element list.
+	 *
+	 * @covers ::isProtectedAction
+	 */
+	public function testIsProtectedActionToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => 'history',
+				'CrawlerProtectedApiModules' => [],
+				'CrawlerProtectedQueryParams' => [ 'target' ],
+				'CrawlerProtectedRestPaths' => [],
+				'CrawlerProtectedSpecialPages' => [],
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			new HookRunnerFake(),
+			false,
+			new NullLogger()
+		);
+
+		$this->assertTrue( $service->isProtectedAction( 'history' ) );
+		$this->assertFalse( $service->isProtectedAction( 'edit' ) );
 	}
 
 	/**
-	 * @covers ::checkSpecialPage
+	 * When CrawlerProtectedQueryParams is set to a scalar string instead of an
+	 * array, the service should still function and treat the scalar as a
+	 * single-element list.
+	 *
+	 * @covers ::hasProtectedQueryParam
 	 */
-	public function testHookCanAllowOtherwiseDeniedSpecialPage() {
-		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$user->method( 'isRegistered' )->willReturn( false );
+	public function testHasProtectedQueryParamToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedApiModules' => [],
+				'CrawlerProtectedQueryParams' => 'target',
+				'CrawlerProtectedRestPaths' => [],
+				'CrawlerProtectedSpecialPages' => [],
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			new HookRunnerFake(),
+			false,
+			new NullLogger()
+		);
+
 		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, null ],
+			[ 'target', null, 'Project:Foo' ],
+		] );
 
-		$responseFactory = $this->createMock( ResponseFactory::class );
-		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
-
-		$seen = [];
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
-			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
-			$shouldDeny = false;
-		};
-
-		$service = $this->buildService(
-			[ 'whatlinkshere' ], [], [], $responseFactory, true, [ 'target' ], false, [], [], [ $handler ]
-		);
-
-		$this->assertTrue(
-			$service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request )
-		);
-		$this->assertSame( [ $user, $request, 'WhatLinksHere', true ], $seen );
+		$this->assertTrue( $service->hasProtectedQueryParam( $request ) );
 	}
 
 	/**
-	 * @covers ::checkSpecialPage
+	 * When CrawlerProtectedSpecialPages is set to a scalar string instead of an
+	 * array, the service should still function and treat the scalar as a
+	 * single-element list.
+	 *
+	 * @covers ::isProtectedSpecialPage
 	 */
-	public function testHookCanDenyOtherwiseAllowedSpecialPage() {
-		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$user->method( 'isRegistered' )->willReturn( false );
-		$request = $this->createMock( self::$webRequestClassName );
-
-		$responseFactory = $this->createMock( ResponseFactory::class );
-		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
-
-		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
-			$shouldDeny = true;
-		};
-
-		$service = $this->buildService(
-			[ 'whatlinkshere' ], [], [], $responseFactory, true, [ 'target' ], false, [], [], [ $handler ]
+	public function testIsProtectedSpecialPageToleratesScalarConfig() {
+		$options = new ServiceOptions(
+			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
+			[
+				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedApiModules' => [],
+				'CrawlerProtectedQueryParams' => [],
+				'CrawlerProtectedRestPaths' => [],
+				'CrawlerProtectedSpecialPages' => 'WhatLinksHere',
+				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionProtectRevisions' => true,
+				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			]
+		);
+		$service = new CrawlerProtectionService(
+			$options,
+			$this->createMock( ResponseFactory::class ),
+			new HookRunnerFake(),
+			false,
+			new NullLogger()
 		);
 
-		$this->assertFalse( $service->checkSpecialPage( 'Search', $output, $user, $request ) );
+		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+		$this->assertFalse( $service->isProtectedSpecialPage( 'Search' ) );
 	}
 
 	// ---------------------------------------------------------------
@@ -1442,6 +1564,171 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ]
 		);
 		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+
+	// ---------------------------------------------------------------
+	// CrawlerProtectionShouldDeny hook tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testHookCanAllowOtherwiseDeniedPerformAction() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'action', null, 'history' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$seen = [];
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+			$shouldDeny = false;
+		};
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], false, [ $handler ]
+		);
+
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+		$this->assertSame( [ $user, $request, null, true ], $seen );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testHookCanDenyOtherwiseAllowedPerformAction() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], false, [ $handler ]
+		);
+
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testHookIsNotRunInCliMode() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$called = false;
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$called ) {
+			$called = true;
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], null, true, [ 'target' ], true, [], [], false, [ $handler ]
+		);
+
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+		$this->assertFalse( $called );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testHookAbortReturnValueKeepsDecision() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'action', null, 'history' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$secondCalled = false;
+		$first = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+			$shouldDeny = false;
+			return false;
+		};
+		$second = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$secondCalled ) {
+			$secondCalled = true;
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], false, [ $first, $second ]
+		);
+
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+		$this->assertFalse( $secondCalled );
+	}
+
+	/**
+	 * @covers ::checkSpecialPage
+	 */
+	public function testHookCanAllowOtherwiseDeniedSpecialPage() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$seen = [];
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+			$shouldDeny = false;
+		};
+
+		$service = $this->buildService(
+			[ 'whatlinkshere' ], [], [], $responseFactory, true, [ 'target' ], false, [], [], false, [ $handler ]
+		);
+
+		$this->assertTrue(
+			$service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request )
+		);
+		$this->assertSame( [ $user, $request, 'WhatLinksHere', true ], $seen );
+	}
+
+	/**
+	 * @covers ::checkSpecialPage
+	 */
+	public function testHookCanDenyOtherwiseAllowedSpecialPage() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) {
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[ 'whatlinkshere' ], [], [], $responseFactory, true, [ 'target' ], false, [], [], false, [ $handler ]
+		);
+
+		$this->assertFalse( $service->checkSpecialPage( 'Search', $output, $user, $request ) );
 	}
 }
 

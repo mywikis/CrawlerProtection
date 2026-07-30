@@ -136,11 +136,15 @@ class ResponseFactory {
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()
 		);
 
-		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
-			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		} else {
+		$msg = wfMessage( 'crawlerprotection-accessdenied-title' );
+		// setPageTitleMsg() was added in MediaWiki 1.41; fall back to
+		// setPageTitle() for earlier versions.  Using method_exists() keeps
+		// both branches reachable in tests regardless of MW_VERSION.
+		if ( method_exists( $output, 'setPageTitleMsg' ) ) {
 			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
-			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
+			$output->setPageTitleMsg( $msg );
+		} else {
+			$output->setPageTitle( $msg );
 		}
 	}
 }
