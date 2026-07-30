@@ -1373,6 +1373,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+				'CrawlerProtectionTrustXForwardedFor' => false,
 			]
 		);
 		$service = new CrawlerProtectionService(
@@ -1406,6 +1407,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+				'CrawlerProtectionTrustXForwardedFor' => false,
 			]
 		);
 		$service = new CrawlerProtectionService(
@@ -1444,6 +1446,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
+				'CrawlerProtectionTrustXForwardedFor' => false,
 			]
 		);
 		$service = new CrawlerProtectionService(
