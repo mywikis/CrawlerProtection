@@ -1625,6 +1625,41 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
+	 * The allowlisted-IP short circuit must not skip the hook, so handlers can
+	 * still deny a request coming from an allowed IP.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testHookRunsForAllowlistedIP() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'action', null, 'history' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$seen = [];
+		$handler = static function ( $user2, $request2, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = [ $user2, $request2, $specialPageName, $shouldDeny ];
+			$shouldDeny = true;
+		};
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '1.2.3.4' ], $responseFactory, true, [ 'target' ], false, [], [], false,
+			[ $handler ]
+		);
+
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+		$this->assertSame( [ $user, $request, null, false ], $seen );
+	}
+
+	/**
 	 * @covers ::checkPerformAction
 	 */
 	public function testHookIsNotRunInCliMode() {
