@@ -1,5 +1,5 @@
 ---
-applyTo: "*"
+applyTo: "**/*"
 ---
 
 # MediaWiki Extension Clean Code Best Practices

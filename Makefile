@@ -3,7 +3,7 @@ export
 
 # setup for docker-compose-ci build directory
 ifeq (,$(wildcard ./build/))
-    $(shell git submodule update --init --remote)
+    $(shell git submodule update --init)
 endif
 
 EXTENSION=CrawlerProtection
