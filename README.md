@@ -91,3 +91,43 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   users and bypass all protection checks. Set to `true` if you do not want
   crawlers that receive a temporary account to bypass protection.
 
+# Hooks
+
+## CrawlerProtectionShouldDeny
+
+Runs after CrawlerProtection has decided whether to deny a request, but before
+the denial is carried out. Handlers can implement bespoke policy (cookie
+checks, proof-of-work, CAPTCHA integration, fingerprint heuristics, crawler
+allowlists, ...) without patching this extension.
+
+Parameters:
+
+* `User $user` - the user making the request.
+* `WebRequest $request` - the current request.
+* `string|null $specialPageName` - canonical name of the special page being
+  executed, or `null` if the request is not a special page view.
+* `bool &$shouldDeny` - whether the request will be denied. Set it to `true` to
+  deny a request that would otherwise be allowed, or to `false` to allow a
+  request that would otherwise be denied.
+
+Return `false` to stop other handlers from running; the value of `$shouldDeny`
+at that point is still honoured. The hook runs for every web request that
+reaches CrawlerProtection (but not on the command line), including requests by
+registered users and requests that touch no protected resource, so handlers
+must inspect `$shouldDeny` and the request themselves rather than assuming a
+denial is pending. It does not run for Action API or REST API requests, which
+are governed solely by `$wgCrawlerProtectedApiModules` and
+`$wgCrawlerProtectedRestPaths`.
+
+Example, allowing anonymous access when a request carries a secret header:
+
+```php
+$wgHooks['CrawlerProtectionShouldDeny'][] = static function (
+	$user, $request, $specialPageName, &$shouldDeny
+) {
+	if ( $shouldDeny && $request->getHeader( 'X-My-Crawler-Token' ) === $secret ) {
+		$shouldDeny = false;
+	}
+};
+```
+
