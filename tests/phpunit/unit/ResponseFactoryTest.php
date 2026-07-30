@@ -321,4 +321,71 @@ class ResponseFactoryTest extends TestCase {
 		$factory = $this->buildFactory();
 		$this->assertInstanceOf( ResponseFactory::class, $factory );
 	}
+
+	/**
+	 * When OutputPage exposes setPageTitleMsg() (MW 1.41+), denyAccessPretty()
+	 * must call that method rather than the legacy setPageTitle().
+	 *
+	 * @covers ::denyAccess
+	 * @covers ::denyAccessPretty
+	 */
+	public function testDenyAccessPrettyCallsSetPageTitleMsgOnModernOutputPage() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		$output = $this->createMock( self::$outputPageClassName );
+		$output->expects( $this->once() )->method( 'setPageTitleMsg' );
+		$output->expects( $this->never() )->method( 'setPageTitle' );
+
+		$this->buildFactory()->denyAccess( $output );
+	}
+
+	/**
+	 * When OutputPage lacks setPageTitleMsg() (MW < 1.41), denyAccessPretty()
+	 * must fall back to the legacy setPageTitle() method.
+	 *
+	 * Uses an anonymous stub that deliberately omits setPageTitleMsg() so that
+	 * method_exists() returns false, exercising the backwards-compat branch.
+	 *
+	 * @covers ::denyAccess
+	 * @covers ::denyAccessPretty
+	 */
+	public function testDenyAccessPrettyFallsBackToSetPageTitleOnLegacyOutputPage() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		$setPageTitleCallCount = 0;
+
+		// Anonymous class without setPageTitleMsg() simulates MW < 1.41 OutputPage.
+		$output = new class ( $setPageTitleCallCount ) {
+			/** @var int */
+			private int $count;
+
+			public function __construct( int &$count ) {
+				$this->count = &$count;
+			}
+
+			public function setStatusCode( int $code ): void {
+			}
+
+			public function addWikiTextAsInterface( string $text ): void {
+			}
+
+			public function setPageTitle( $title ): void {
+				$this->count++;
+			}
+
+			// Intentionally no setPageTitleMsg() to trigger the legacy branch.
+		};
+
+		$this->buildFactory()->denyAccess( $output );
+
+		$this->assertSame( 1, $setPageTitleCallCount );
+	}
 }

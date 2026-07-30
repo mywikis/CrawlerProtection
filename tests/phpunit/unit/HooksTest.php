@@ -118,8 +118,9 @@ class HooksTest extends TestCase {
 	public function testOnSpecialPageBeforeExecuteDelegatesToService() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
 
-		$context = $this->createMockContext( $user, $output );
+		$context = $this->createMockContext( $user, $output, $request );
 
 		$special = $this->createMock( self::$specialPageClassName );
 		$special->method( 'getName' )->willReturn( 'WhatLinksHere' );
@@ -128,7 +129,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkSpecialPage' )
-			->with( 'WhatLinksHere', $output, $user )
+			->with( 'WhatLinksHere', $output, $user, $request )
 			->willReturn( false );
 
 		$hooks = new Hooks( $service );
@@ -143,8 +144,9 @@ class HooksTest extends TestCase {
 	public function testOnSpecialPageBeforeExecutePassesThroughTrue() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
 
-		$context = $this->createMockContext( $user, $output );
+		$context = $this->createMockContext( $user, $output, $request );
 
 		$special = $this->createMock( self::$specialPageClassName );
 		$special->method( 'getName' )->willReturn( 'Search' );
@@ -153,6 +155,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkSpecialPage' )
+			->with( 'Search', $output, $user, $request )
 			->willReturn( true );
 
 		$hooks = new Hooks( $service );
@@ -166,22 +169,27 @@ class HooksTest extends TestCase {
 	 *
 	 * @param \PHPUnit\Framework\MockObject\MockObject $user Mock user object
 	 * @param \PHPUnit\Framework\MockObject\MockObject $output Mock output object
+	 * @param \PHPUnit\Framework\MockObject\MockObject $request Mock request object
 	 * @return \stdClass Mock context
 	 */
-	private function createMockContext( $user, $output ) {
-		return new class( $user, $output ) {
+	private function createMockContext( $user, $output, $request ) {
+		return new class( $user, $output, $request ) {
 			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $user;
 			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $output;
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
+			private $request;
 
 			/**
 			 * @param \PHPUnit\Framework\MockObject\MockObject $user
 			 * @param \PHPUnit\Framework\MockObject\MockObject $output
+			 * @param \PHPUnit\Framework\MockObject\MockObject $request
 			 */
-			public function __construct( $user, $output ) {
+			public function __construct( $user, $output, $request ) {
 				$this->user = $user;
 				$this->output = $output;
+				$this->request = $request;
 			}
 
 			/**
@@ -197,6 +205,263 @@ class HooksTest extends TestCase {
 			public function getOutput() {
 				return $this->output;
 			}
+
+			/**
+			 * @return \PHPUnit\Framework\MockObject\MockObject
+			 */
+			public function getRequest() {
+				return $this->request;
+			}
 		};
+	}
+
+	/**
+	 * Build a stub API module exposing a module name and request parameters.
+	 *
+	 * @param string $moduleName
+	 * @param array $params
+	 * @return \stdClass Stub API module
+	 */
+	private function makeApiModule( string $moduleName, array $params = [] ) {
+		$request = new class( $params ) {
+			/** @var array */
+			private $params;
+
+			public function __construct( array $params ) {
+				$this->params = $params;
+			}
+
+			public function getVal( $name ) {
+				return $this->params[$name] ?? null;
+			}
+		};
+
+		$main = new class( $request ) {
+			/** @var \stdClass */
+			private $request;
+
+			public function __construct( $request ) {
+				$this->request = $request;
+			}
+
+			public function getRequest() {
+				return $this->request;
+			}
+		};
+
+		return new class( $moduleName, $main ) {
+			/** @var string */
+			private $moduleName;
+			/** @var \stdClass */
+			private $main;
+
+			public function __construct( string $moduleName, $main ) {
+				$this->moduleName = $moduleName;
+				$this->main = $main;
+			}
+
+			public function getModuleName(): string {
+				return $this->moduleName;
+			}
+
+			public function getMain() {
+				return $this->main;
+			}
+		};
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecuteDelegatesToService() {
+		$user = $this->createMock( self::$userClassName );
+		$module = $this->makeApiModule( 'compare' );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModules' )
+			->with( [ 'compare' ], $user )
+			->willReturn( false );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$result = $hooks->onApiCheckCanExecute( $module, $user, $message );
+
+		$this->assertFalse( $result );
+		$this->assertNotNull( $message );
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecutePassesThroughWhenAllowed() {
+		$user = $this->createMock( self::$userClassName );
+		$module = $this->makeApiModule( 'query' );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModules' )
+			->with( [ 'query' ], $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$result = $hooks->onApiCheckCanExecute( $module, $user, $message );
+
+		// Returns null (no explicit false) when allowed
+		$this->assertNotFalse( $result );
+		$this->assertNull( $message );
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecuteCollectsQuerySubModules() {
+		$user = $this->createMock( self::$userClassName );
+		$module = $this->makeApiModule( 'query', [
+			'prop' => 'revisions|links',
+			'list' => 'recentchanges',
+			'meta' => '',
+			'generator' => 'allpages',
+		] );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModules' )
+			->with(
+				[ 'query', 'revisions', 'links', 'recentchanges', 'allpages' ],
+				$user
+			)
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$hooks->onApiCheckCanExecute( $module, $user, $message );
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecuteHandlesUnitSeparatorMultiValues() {
+		$user = $this->createMock( self::$userClassName );
+		$module = $this->makeApiModule( 'query', [
+			'prop' => "\x1frevisions\x1flinks",
+		] );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModules' )
+			->with( [ 'query', 'revisions', 'links' ], $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$hooks->onApiCheckCanExecute( $module, $user, $message );
+	}
+
+	/**
+	 * @covers ::onApiCheckCanExecute
+	 */
+	public function testOnApiCheckCanExecuteIgnoresSubModulesForOtherActions() {
+		$user = $this->createMock( self::$userClassName );
+		$module = $this->makeApiModule( 'parse', [ 'prop' => 'links|templates' ] );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkApiModules' )
+			->with( [ 'parse' ], $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$message = null;
+		$hooks->onApiCheckCanExecute( $module, $user, $message );
+	}
+
+	/**
+	 * Build a stub REST handler exposing an authority for the given user.
+	 *
+	 * @param \PHPUnit\Framework\MockObject\MockObject $user
+	 * @return \stdClass Stub REST handler
+	 */
+	private function makeRestHandler( $user ) {
+		$authority = new class( $user ) {
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
+			private $user;
+
+			/**
+			 * @param \PHPUnit\Framework\MockObject\MockObject $user
+			 */
+			public function __construct( $user ) {
+				$this->user = $user;
+			}
+
+			/**
+			 * @return \PHPUnit\Framework\MockObject\MockObject
+			 */
+			public function getUser() {
+				return $this->user;
+			}
+		};
+
+		return new class( $authority ) {
+			/** @var \stdClass */
+			private $authority;
+
+			/**
+			 * @param \stdClass $authority
+			 */
+			public function __construct( $authority ) {
+				$this->authority = $authority;
+			}
+
+			/**
+			 * @return \stdClass
+			 */
+			public function getAuthority() {
+				return $this->authority;
+			}
+		};
+	}
+
+	/**
+	 * @covers ::onRestCheckCanExecute
+	 */
+	public function testOnRestCheckCanExecuteDelegatesToService() {
+		$user = $this->createMock( self::$userClassName );
+		$handler = $this->makeRestHandler( $user );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkRestPath' )
+			->with( '/page/Main_Page/history', $user )
+			->willReturn( false );
+
+		$hooks = new Hooks( $service );
+		$error = null;
+		$result = $hooks->onRestCheckCanExecute( null, $handler, '/page/Main_Page/history', null, $error );
+
+		$this->assertFalse( $result );
+		$this->assertNotNull( $error );
+	}
+
+	/**
+	 * @covers ::onRestCheckCanExecute
+	 */
+	public function testOnRestCheckCanExecutePassesThroughWhenAllowed() {
+		$user = $this->createMock( self::$userClassName );
+		$handler = $this->makeRestHandler( $user );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->once() )
+			->method( 'checkRestPath' )
+			->with( '/search', $user )
+			->willReturn( true );
+
+		$hooks = new Hooks( $service );
+		$error = null;
+		$result = $hooks->onRestCheckCanExecute( null, $handler, '/search', null, $error );
+
+		$this->assertNotFalse( $result );
+		$this->assertNull( $error );
 	}
 }

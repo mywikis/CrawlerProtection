@@ -1,4 +1,7 @@
 {
+    "require": {
+        "php": ">=7.4"
+    },
     "require-dev": {
         "phpunit/phpunit": "^9.0",
         "mediawiki/mediawiki-codesniffer": "43.0.0",
@@ -13,7 +16,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/"
+            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\": "tests/phpunit/unit/",
+            "MediaWiki\\Extension\\CrawlerProtection\\Tests\\Integration\\": "tests/phpunit/integration/"
         },
         "files": [
             "tests/phpunit/stubs.php",
@@ -23,10 +27,12 @@
     "scripts": {
         "test": [
             "@phpcs",
+            "@minus-x",
             "@phpunit"
         ],
         "phpcs": "vendor/bin/phpcs -sp --standard=.phpcs.xml",
         "phpcbf": "vendor/bin/phpcbf --standard=.phpcs.xml",
+        "minus-x": "vendor/bin/minus-x check .",
         "phpunit": "php ../../tests/phpunit/phpunit.php tests/phpunit/"
     },
     "config": {
