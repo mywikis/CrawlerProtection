@@ -279,6 +279,14 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 				$actual->getParameters()[$index]->isPassedByReference(),
 				"Parameter #$index of $method must match the by-reference mode of $interface"
 			);
+			// The handlers are deliberately untyped, so a reordering of
+			// same-arity parameters in core would otherwise go unnoticed:
+			// the parameter names are what pins the order.
+			$this->assertSame(
+				$parameter->getName(),
+				$actual->getParameters()[$index]->getName(),
+				"Parameter #$index of $method must have the same name as in $interface"
+			);
 		}
 	}
 
@@ -289,10 +297,6 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		return [
 			'ApiCheckCanExecute' => [
 				'MediaWiki\\Api\\Hook\\ApiCheckCanExecuteHook',
-				'onApiCheckCanExecute',
-			],
-			'ApiCheckCanExecute (legacy namespace)' => [
-				'MediaWiki\\Hook\\ApiCheckCanExecuteHook',
 				'onApiCheckCanExecute',
 			],
 			'RestCheckCanExecute' => [
@@ -604,5 +608,140 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
 		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/bare', $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// Hooks::onApiCheckCanExecute through a real ApiMain
+	// ---------------------------------------------------------------
+
+	/**
+	 * Build a real ApiMain around a FauxRequest carrying the given parameters.
+	 *
+	 * A FauxRequest puts ApiMain into internal mode, where execute() calls
+	 * executeAction() directly: checkExecutePermissions() - and therefore the
+	 * ApiCheckCanExecute hook - still runs, but an ApiUsageException
+	 * propagates to the caller instead of being formatted into a response
+	 * body.  ApiMain moved into the MediaWiki\Api namespace after MW 1.39,
+	 * which keeps a class alias under the old global name on every supported
+	 * release, so the unqualified name is used here.
+	 *
+	 * @param array $params Request parameters
+	 * @param \MediaWiki\User\User|\User $user User making the request
+	 * @return \ApiMain
+	 */
+	private function makeApiMain( array $params, $user ) {
+		$context = new \RequestContext();
+		$context->setRequest( $this->makeRequest( $params ) );
+		$context->setUser( $user );
+		$context->setTitle(
+			$this->getServiceContainer()->getTitleFactory()->makeTitle( NS_MAIN, 'Test' )
+		);
+
+		return new \ApiMain( $context );
+	}
+
+	/**
+	 * Install a web-mode CrawlerProtectionService in the container so that the
+	 * hook handler built by ObjectFactory uses it instead of the CLI-mode
+	 * service that ServiceWiring.php produces under PHPUnit.
+	 */
+	private function useWebModeServiceInContainer(): void {
+		$this->setService(
+			'CrawlerProtection.CrawlerProtectionService',
+			$this->makeWebModeService()
+		);
+	}
+
+	/**
+	 * The hook handler must deny an anonymous action=query request naming a
+	 * protected sub-module, and the denial must carry HTTP 403 rather than
+	 * core's default "200 OK with an error body".
+	 *
+	 * This exercises the adapter itself - sub-module parsing, the $message
+	 * contract with core, and the status code - which the service-level tests
+	 * above cannot reach.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 */
+	public function testApiCheckCanExecuteDeniesAnonymousProtectedSubModule(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+		$this->useWebModeServiceInContainer();
+
+		$api = $this->makeApiMain(
+			[ 'action' => 'query', 'prop' => 'revisions', 'titles' => 'Main Page' ],
+			$this->makeAnonUser()
+		);
+
+		try {
+			$api->execute();
+			$this->fail( 'An anonymous request for a protected sub-module must be denied' );
+		} catch ( \ApiUsageException $e ) {
+			$this->assertTrue(
+				$e->getStatusValue()->hasMessage( 'crawlerprotection-accessdenied-text' ),
+				'The denial must use the extension error message'
+			);
+		}
+
+		$response = $api->getRequest()->response();
+		$this->assertSame( 403, $response->getStatusCode() );
+		$this->assertSame(
+			'noindex,nofollow',
+			$response->getHeader( 'X-Robots-Tag' ),
+			'A denied API request must tell crawlers not to re-request the URL'
+		);
+	}
+
+	/**
+	 * The hook handler must let an anonymous request through when no
+	 * configured module is involved.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 */
+	public function testApiCheckCanExecuteAllowsUnprotectedModule(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+		$this->useWebModeServiceInContainer();
+
+		$api = $this->makeApiMain(
+			[ 'action' => 'query', 'meta' => 'siteinfo' ],
+			$this->makeAnonUser()
+		);
+
+		$api->execute();
+
+		$this->assertArrayHasKey(
+			'query',
+			$api->getResult()->getResultData( [], [ 'Strip' => 'all' ] ),
+			'An unprotected module must execute normally'
+		);
+	}
+
+	/**
+	 * A registered user must not be denied by the hook handler even when the
+	 * module is protected.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 */
+	public function testApiCheckCanExecuteAllowsRegisteredUserOnProtectedModule(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'siteinfo' ],
+		] );
+		$this->useWebModeServiceInContainer();
+
+		$api = $this->makeApiMain(
+			[ 'action' => 'query', 'meta' => 'siteinfo' ],
+			$this->getMutableTestUser()->getUser()
+		);
+
+		$api->execute();
+
+		$this->assertArrayHasKey(
+			'query',
+			$api->getResult()->getResultData( [], [ 'Strip' => 'all' ] ),
+			'A registered user must not be denied'
+		);
 	}
 }

@@ -420,6 +420,11 @@ class CrawlerProtectionService {
 	 * spans a "/" separator. See $wgCrawlerProtectedRestPaths in the
 	 * README for example patterns.
 	 *
+	 * The path passed by the RestCheckCanExecute hook is module-relative:
+	 * core's Router strips the rest.php root and the module prefix, so
+	 * "/w/rest.php/v1/page/Main_Page/history" arrives as
+	 * "/page/Main_Page/history" and patterns must omit the prefix.
+	 *
 	 * @param string $path
 	 * @return bool
 	 */

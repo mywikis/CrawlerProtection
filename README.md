@@ -65,8 +65,17 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
 * `$wgCrawlerProtectedRestPaths` - array of REST API path glob patterns to
   block for anonymous users (default: `[]`). Each pattern is tested with
   `fnmatch()` with the `FNM_PATHNAME` flag, so `*` matches any single path
-  component (it never spans a `/`) and `**` is not supported. Example that
-  protects history and compare endpoints:
+  component (it never spans a `/`) and `**` is not supported.
+
+  **Patterns are module-relative: leave out the module prefix.** MediaWiki's
+  REST router strips the `rest.php` root *and* the module prefix before the
+  path reaches the extension, so `GET /w/rest.php/v1/page/Main_Page/history`
+  is matched as `/page/Main_Page/history`. Writing `/v1/page/*/history` - the
+  form that appears in an access log - therefore never matches, and no warning
+  is emitted. The upside is that one pattern covers every module version:
+  `/page/*/history` protects `/v1`, `/coredev/v0` and any future prefix alike.
+
+  Example that protects history and compare endpoints:
   ```php
   $wgCrawlerProtectedRestPaths = [ '/page/*/history', '/revision/*/compare/*' ];
   ```

@@ -11,6 +11,12 @@ applyTo: "**/*.php"
   - `SpecialPageBeforeExecute` (index.php special pages)
   - `ApiCheckCanExecute` (api.php modules)
   - `RestCheckCanExecute` (rest.php paths, MediaWiki 1.44+)
+- The extension also fires its own `CrawlerProtectionShouldDeny` hook
+  (`includes/Hook/CrawlerProtectionShouldDenyHook.php`, dispatched via
+  `includes/HookRunner.php`) from every entry point above. Handlers receive the
+  entry point and may flip the decision either way, so they can deny requests
+  that the built-in checks would allow - including requests from registered
+  users - or allow requests the built-in checks would deny.
 - `includes/Hooks.php` must remain a thin adapter layer delegating to services.
 - Business logic belongs in `CrawlerProtectionService` and response rendering in `ResponseFactory`.
 - Instantiate services only in `includes/ServiceWiring.php`.

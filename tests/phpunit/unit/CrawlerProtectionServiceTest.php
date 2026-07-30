@@ -1013,8 +1013,15 @@ class CrawlerProtectionServiceTest extends TestCase {
 	// ---------------------------------------------------------------
 
 	/**
-	 * Verify that the IP used for allowlist matching comes from $request->getIP()
-	 * and not from the (now irrelevant) username.
+	 * Verify that the IP used for allowlist matching is read from
+	 * $request->getIP() rather than from User::getName().
+	 *
+	 * For a real anonymous user the two agree — User::getName() returns
+	 * IPUtils::sanitizeIP( $this->getRequest()->getIP() ) — so this is a
+	 * mechanism check, not a regression test for a past behavioural bug:
+	 * it pins the request as the single source of the client address, which
+	 * is what makes the same resolution reusable on api.php and rest.php,
+	 * where no User-derived address is available.
 	 *
 	 * @covers ::checkPerformAction
 	 */
@@ -1022,8 +1029,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
-		// Username does NOT match the allowlist; request IP DOES.
-		// getName() must never be called for IP resolution.
+		// getName() must never be consulted for IP resolution.
 		$user->expects( $this->never() )->method( 'getName' );
 
 		$request = $this->createMock( self::$webRequestClassName );
@@ -1653,8 +1659,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 	/**
 	 * Without a request the allowlist cannot be evaluated, so a protected
-	 * module stays protected rather than being allowed by a username that
-	 * happens to look like an allowlisted IP.
+	 * module stays protected: the extension never falls back to any other
+	 * source for the client address.
 	 *
 	 * @covers ::checkApiModule
 	 */
@@ -1817,8 +1823,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 	/**
 	 * Without a request the allowlist cannot be evaluated, so a protected
-	 * path stays protected rather than being allowed by a username that
-	 * happens to look like an allowlisted IP.
+	 * path stays protected: the extension never falls back to any other
+	 * source for the client address.
 	 *
 	 * @covers ::checkRestPath
 	 */
