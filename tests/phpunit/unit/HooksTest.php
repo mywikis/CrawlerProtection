@@ -118,8 +118,9 @@ class HooksTest extends TestCase {
 	public function testOnSpecialPageBeforeExecuteDelegatesToService() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
 
-		$context = $this->createMockContext( $user, $output );
+		$context = $this->createMockContext( $user, $output, $request );
 
 		$special = $this->createMock( self::$specialPageClassName );
 		$special->method( 'getName' )->willReturn( 'WhatLinksHere' );
@@ -128,7 +129,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkSpecialPage' )
-			->with( 'WhatLinksHere', $output, $user )
+			->with( 'WhatLinksHere', $output, $user, $request )
 			->willReturn( false );
 
 		$hooks = new Hooks( $service );
@@ -143,8 +144,9 @@ class HooksTest extends TestCase {
 	public function testOnSpecialPageBeforeExecutePassesThroughTrue() {
 		$output = $this->createMock( self::$outputPageClassName );
 		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
 
-		$context = $this->createMockContext( $user, $output );
+		$context = $this->createMockContext( $user, $output, $request );
 
 		$special = $this->createMock( self::$specialPageClassName );
 		$special->method( 'getName' )->willReturn( 'Search' );
@@ -153,6 +155,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkSpecialPage' )
+			->with( 'Search', $output, $user, $request )
 			->willReturn( true );
 
 		$hooks = new Hooks( $service );
@@ -166,22 +169,27 @@ class HooksTest extends TestCase {
 	 *
 	 * @param \PHPUnit\Framework\MockObject\MockObject $user Mock user object
 	 * @param \PHPUnit\Framework\MockObject\MockObject $output Mock output object
+	 * @param \PHPUnit\Framework\MockObject\MockObject $request Mock request object
 	 * @return \stdClass Mock context
 	 */
-	private function createMockContext( $user, $output ) {
-		return new class( $user, $output ) {
+	private function createMockContext( $user, $output, $request ) {
+		return new class( $user, $output, $request ) {
 			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $user;
 			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $output;
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
+			private $request;
 
 			/**
 			 * @param \PHPUnit\Framework\MockObject\MockObject $user
 			 * @param \PHPUnit\Framework\MockObject\MockObject $output
+			 * @param \PHPUnit\Framework\MockObject\MockObject $request
 			 */
-			public function __construct( $user, $output ) {
+			public function __construct( $user, $output, $request ) {
 				$this->user = $user;
 				$this->output = $output;
+				$this->request = $request;
 			}
 
 			/**
@@ -196,6 +204,13 @@ class HooksTest extends TestCase {
 			 */
 			public function getOutput() {
 				return $this->output;
+			}
+
+			/**
+			 * @return \PHPUnit\Framework\MockObject\MockObject
+			 */
+			public function getRequest() {
+				return $this->request;
 			}
 		};
 	}
