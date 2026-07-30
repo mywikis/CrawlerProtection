@@ -336,7 +336,7 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
-		$output = $this->createMock( self::$outputPageClassName );
+		$output = $this->buildOutputMock();
 		$output->expects( $this->once() )->method( 'setPageTitleMsg' );
 		$output->expects( $this->never() )->method( 'setPageTitle' );
 
@@ -379,6 +379,20 @@ class ResponseFactoryTest extends TestCase {
 
 			public function setPageTitle( $title ): void {
 				$this->count++;
+			}
+
+			public function setRobotPolicy( $policy ): void {
+			}
+
+			public function getRequest() {
+				return new class {
+					public function response() {
+						return new class {
+							public function header( $string, $replace = true, $code = null ) {
+							}
+						};
+					}
+				};
 			}
 
 			// Intentionally no setPageTitleMsg() to trigger the legacy branch.
