@@ -285,8 +285,10 @@ class CrawlerProtectionService {
 	 * Determine whether the given REST path matches any configured
 	 * protected-path pattern.
 	 *
-	 * Each pattern is tested as a glob (fnmatch), which allows wildcards,
-	 * for example "/page/*/history" or "/revision/*/compare/*".
+	 * Each pattern is tested as a glob (fnmatch) with the FNM_PATHNAME
+	 * flag, so a "*" wildcard matches a single path component and never
+	 * spans a "/" separator. See $wgCrawlerProtectedRestPaths in the
+	 * README for example patterns.
 	 *
 	 * @param string $path
 	 * @return bool
@@ -294,7 +296,7 @@ class CrawlerProtectionService {
 	public function isProtectedRestPath( string $path ): bool {
 		$patterns = $this->options->get( 'CrawlerProtectedRestPaths' ) ?? [];
 		foreach ( $patterns as $pattern ) {
-			if ( fnmatch( $pattern, $path ) ) {
+			if ( fnmatch( $pattern, $path, FNM_PATHNAME ) ) {
 				return true;
 			}
 		}

@@ -63,8 +63,9 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   ```
 * `$wgCrawlerProtectedRestPaths` - array of REST API path glob patterns to
   block for anonymous users (default: `[]`). Each pattern is tested with
-  `fnmatch()`, so `*` matches any single path component and `**` is not
-  supported. Example that protects history and compare endpoints:
+  `fnmatch()` with the `FNM_PATHNAME` flag, so `*` matches any single path
+  component (it never spans a `/`) and `**` is not supported. Example that
+  protects history and compare endpoints:
   ```php
   $wgCrawlerProtectedRestPaths = [ '/page/*/history', '/revision/*/compare/*' ];
   ```

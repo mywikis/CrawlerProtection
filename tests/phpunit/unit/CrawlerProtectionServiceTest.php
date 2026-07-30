@@ -1133,6 +1133,16 @@ class CrawlerProtectionServiceTest extends TestCase {
 		$this->assertFalse( $service->isProtectedRestPath( '/search' ) );
 	}
 
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathWildcardDoesNotSpanSlash() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertFalse( $service->isProtectedRestPath( '/page/Foo/Bar/history' ) );
+	}
+
 	// ---------------------------------------------------------------
 	// checkRestPath tests
 	// ---------------------------------------------------------------
