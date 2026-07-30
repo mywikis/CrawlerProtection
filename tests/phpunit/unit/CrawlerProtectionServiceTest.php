@@ -48,6 +48,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param bool $protectRevisions
 	 * @param array $protectedQueryParams
 	 * @param bool $cliMode
+	 * @param array $protectedApiModules
+	 * @param array $protectedRestPaths
 	 * @param bool $treatTempUsersAsAnon
 	 * @return CrawlerProtectionService
 	 */
@@ -59,13 +61,17 @@ class CrawlerProtectionServiceTest extends TestCase {
 		bool $protectRevisions = true,
 		array $protectedQueryParams = [ 'target' ],
 		bool $cliMode = false,
+		array $protectedApiModules = [],
+		array $protectedRestPaths = [],
 		bool $treatTempUsersAsAnon = false
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => $protectedActions,
+				'CrawlerProtectedApiModules' => $protectedApiModules,
 				'CrawlerProtectedQueryParams' => $protectedQueryParams,
+				'CrawlerProtectedRestPaths' => $protectedRestPaths,
 				'CrawlerProtectedSpecialPages' => $protectedPages,
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
@@ -1089,7 +1095,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		// treatTempUsersAsAnon = true
 		$service = $this->buildService(
-			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, true
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], true
 		);
 		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
 	}
@@ -1115,7 +1121,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		// treatTempUsersAsAnon = true, but user is not a temp account
 		$service = $this->buildService(
-			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, true
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], true
 		);
 		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
 	}
@@ -1136,7 +1142,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => 'history',
+				'CrawlerProtectedApiModules' => [],
 				'CrawlerProtectedQueryParams' => [ 'target' ],
+				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => [],
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
@@ -1166,7 +1174,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedApiModules' => [],
 				'CrawlerProtectedQueryParams' => 'target',
+				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => [],
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
@@ -1201,7 +1211,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
 			[
 				'CrawlerProtectedActions' => [],
+				'CrawlerProtectedApiModules' => [],
 				'CrawlerProtectedQueryParams' => [],
+				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => 'WhatLinksHere',
 				'CrawlerProtectionAllowedIPs' => [],
 				'CrawlerProtectionProtectRevisions' => true,
@@ -1217,5 +1229,326 @@ class CrawlerProtectionServiceTest extends TestCase {
 
 		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
 		$this->assertFalse( $service->isProtectedSpecialPage( 'Search' ) );
+	}
+
+	// ---------------------------------------------------------------
+	// isProtectedApiModule tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::isProtectedApiModule
+	 */
+	public function testIsProtectedApiModuleReturnsTrueForConfiguredModule() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions', 'compare' ]
+		);
+		$this->assertTrue( $service->isProtectedApiModule( 'revisions' ) );
+		$this->assertTrue( $service->isProtectedApiModule( 'compare' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedApiModule
+	 */
+	public function testIsProtectedApiModuleReturnsFalseForUnconfiguredModule() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertFalse( $service->isProtectedApiModule( 'query' ) );
+		$this->assertFalse( $service->isProtectedApiModule( 'parse' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedApiModule
+	 */
+	public function testIsProtectedApiModuleReturnsFalseWhenListEmpty() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, []
+		);
+		$this->assertFalse( $service->isProtectedApiModule( 'revisions' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedApiModule
+	 */
+	public function testIsProtectedApiModuleIsCaseInsensitive() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'Revisions' ]
+		);
+		$this->assertTrue( $service->isProtectedApiModule( 'revisions' ) );
+		$this->assertTrue( $service->isProtectedApiModule( 'REVISIONS' ) );
+		$this->assertTrue( $service->isProtectedApiModule( 'Revisions' ) );
+	}
+
+	// ---------------------------------------------------------------
+	// checkApiModule tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleAllowsRegisteredUser() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleBlocksAnonymousForProtectedModule() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertFalse( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleAllowsAnonymousForUnprotectedModule() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModule( 'query', $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleAllowsWhenListEmpty() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, []
+		);
+		$this->assertTrue( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleAllowsOnCommandLine() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], true, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesBlocksWhenAnySubModuleIsProtected() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertFalse(
+			$service->checkApiModules( [ 'query', 'links', 'revisions' ], $user )
+		);
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesAllowsWhenNoModuleIsProtected() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue(
+			$service->checkApiModules( [ 'query', 'links', 'categories' ], $user )
+		);
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesAllowsRegisteredUser() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModules( [ 'query', 'revisions' ], $user ) );
+	}
+
+	/**
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleAllowsAllowedIP() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [ '1.2.3.4' ], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	// ---------------------------------------------------------------
+	// isProtectedRestPath tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathReturnsFalseWhenListEmpty() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], []
+		);
+		$this->assertFalse( $service->isProtectedRestPath( '/page/Main_Page/history' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathMatchesExactPath() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/Main_Page/history' ]
+		);
+		$this->assertTrue( $service->isProtectedRestPath( '/page/Main_Page/history' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathMatchesGlobPattern() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->isProtectedRestPath( '/page/Main_Page/history' ) );
+		$this->assertTrue( $service->isProtectedRestPath( '/page/Talk:Foo/history' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathDoesNotMatchUnrelatedPath() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertFalse( $service->isProtectedRestPath( '/page/Main_Page' ) );
+		$this->assertFalse( $service->isProtectedRestPath( '/search' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedRestPath
+	 */
+	public function testIsProtectedRestPathWildcardDoesNotSpanSlash() {
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertFalse( $service->isProtectedRestPath( '/page/Foo/Bar/history' ) );
+	}
+
+	// ---------------------------------------------------------------
+	// checkRestPath tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathAllowsRegisteredUser() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathBlocksAnonymousForProtectedPath() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathAllowsAnonymousForUnprotectedPath() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->checkRestPath( '/search', $user ) );
+	}
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathAllowsWhenListEmpty() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [], []
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathAllowsOnCommandLine() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], true, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+	}
+
+	/**
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathAllowsAllowedIP() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
 	}
 }
