@@ -26,6 +26,7 @@
 namespace MediaWiki\Extension\CrawlerProtection;
 
 use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\User\User;
@@ -62,6 +63,9 @@ class CrawlerProtectionService {
 	/** @var ResponseFactory */
 	private ResponseFactory $responseFactory;
 
+	/** @var CrawlerProtectionShouldDenyHook */
+	private CrawlerProtectionShouldDenyHook $hookRunner;
+
 	/** @var bool */
 	private bool $cliMode;
 
@@ -89,18 +93,21 @@ class CrawlerProtectionService {
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
+	 * @param CrawlerProtectionShouldDenyHook $hookRunner
 	 * @param bool $cliMode
 	 * @param LoggerInterface $logger
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
+		CrawlerProtectionShouldDenyHook $hookRunner,
 		bool $cliMode,
 		LoggerInterface $logger
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
 		$this->responseFactory = $responseFactory;
+		$this->hookRunner = $hookRunner;
 		$this->cliMode = $cliMode;
 		$this->logger = $logger;
 
@@ -137,37 +144,38 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) ) {
-			return true;
+		$shouldDeny = false;
+
+		if ( !$this->isUserAllowed( $user ) && !$this->isRequestIPAllowed( $request ) ) {
+			$type = $request->getVal( 'type' );
+			$action = $request->getVal( 'action' );
+			$diffId = (int)$request->getVal( 'diff' );
+			$oldId = (int)$request->getVal( 'oldid' );
+
+			// $wgCrawlerProtectionProtectRevisions independently controls whether
+			// type=revision, diff and oldid requests are blocked. This allows
+			// operators to disable history-listing protection (by removing 'history'
+			// from $wgCrawlerProtectedActions) while still blocking direct access
+			// to individual revisions and diffs, or vice versa.
+			$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
+
+			$shouldDeny = $this->isProtectedAction( $action )
+				|| $this->hasProtectedQueryParam( $request )
+				|| ( $revisionsProtected && (
+					$type === 'revision'
+					|| $diffId > 0
+					|| $oldId > 0
+				) );
 		}
 
-		// Use the canonical client IP from WebRequest (correctly applies
-		// trusted-proxy / X-Forwarded-For handling) rather than the username.
-		if ( $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() ) ) {
-			return true;
-		}
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			null,
+			$shouldDeny
+		);
 
-		$type = $request->getVal( 'type' );
-		$action = $request->getVal( 'action' );
-		$diffId = (int)$request->getVal( 'diff' );
-		$oldId = (int)$request->getVal( 'oldid' );
-
-		// $wgCrawlerProtectionProtectRevisions independently controls whether
-		// type=revision, diff and oldid requests are blocked. This allows
-		// operators to disable history-listing protection (by removing 'history'
-		// from $wgCrawlerProtectedActions) while still blocking direct access
-		// to individual revisions and diffs, or vice versa.
-		$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
-
-		if (
-			$this->isProtectedAction( $action )
-			|| $this->hasProtectedQueryParam( $request )
-			|| ( $revisionsProtected && (
-				$type === 'revision'
-				|| $diffId > 0
-				|| $oldId > 0
-			) )
-		) {
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
@@ -252,17 +260,18 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) ) {
-			return true;
-		}
+		$shouldDeny = !$this->isUserAllowed( $user )
+			&& !$this->isRequestIPAllowed( $request )
+			&& $this->isProtectedSpecialPage( $specialPageName );
 
-		// Use the canonical client IP from WebRequest (correctly applies
-		// trusted-proxy / X-Forwarded-For handling) rather than the username.
-		if ( $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() ) ) {
-			return true;
-		}
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			$specialPageName,
+			$shouldDeny
+		);
 
-		if ( $this->isProtectedSpecialPage( $specialPageName ) ) {
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
@@ -410,6 +419,19 @@ class CrawlerProtectionService {
 		$name = strtolower( $specialPageName );
 
 		return in_array( $name, $normalizedProtectedPages, true );
+	}
+
+	/**
+	 * Checks whether the request originates from an allowed IP range.
+	 *
+	 * The canonical client IP is taken from WebRequest (which correctly applies
+	 * trusted-proxy / X-Forwarded-For handling) rather than the username.
+	 *
+	 * @param WebRequest $request
+	 * @return bool
+	 */
+	private function isRequestIPAllowed( $request ): bool {
+		return $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() );
 	}
 
 	/**

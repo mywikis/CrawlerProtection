@@ -27,7 +27,9 @@ namespace MediaWiki\Extension\CrawlerProtection\Tests\Integration;
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
+use MediaWiki\Extension\CrawlerProtection\HookRunner;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
+use MediaWiki\Logger\LoggerFactory;
 use MediaWikiIntegrationTestCase;
 
 /**
@@ -146,8 +148,10 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 				$this->getServiceContainer()->getMainConfig()
 			),
 			$this->getServiceContainer()->get( 'CrawlerProtection.ResponseFactory' ),
+			new HookRunner( $this->getServiceContainer()->getHookContainer() ),
 			// false = web-request mode — not CLI
-			false
+			false,
+			LoggerFactory::getInstance( 'CrawlerProtection' )
 		);
 	}
 
@@ -326,7 +330,9 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		$output = $this->makeOutputPage();
 
-		$result = $service->checkSpecialPage( 'WhatLinksHere', $output, $user );
+		$request = $this->makeRequest( [] );
+
+		$result = $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request );
 
 		$this->assertFalse( $result, 'checkSpecialPage must return false to abort the request' );
 		if ( method_exists( $output, 'getStatusCode' ) ) {
@@ -349,7 +355,9 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		$user   = $this->getMutableTestUser()->getUser();
 		$output = $this->makeOutputPage();
 
-		$result = $service->checkSpecialPage( 'WhatLinksHere', $output, $user );
+		$request = $this->makeRequest( [] );
+
+		$result = $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request );
 
 		$this->assertTrue( $result, 'checkSpecialPage must return true for registered users' );
 	}
