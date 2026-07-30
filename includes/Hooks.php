@@ -113,7 +113,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 		return $this->crawlerProtectionService->checkSpecialPage(
 			$special->getName(),
 			$special->getContext()->getOutput(),
-			$special->getContext()->getUser()
+			$special->getContext()->getUser(),
+			$special->getContext()->getRequest()
 		);
 	}
 

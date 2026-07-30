@@ -72,6 +72,9 @@
         },
         "CrawlerProtectionProtectRevisions": {
             "value": true
+        },
+        "CrawlerProtectionTreatTempUsersAsAnon": {
+            "value": false
         }
     },
     "ServiceWiringFiles": [

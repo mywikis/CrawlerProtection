@@ -167,6 +167,10 @@ namespace MediaWiki\Request {
 		public function getVal( $name, $default = null ) {
 			return $default;
 		}
+
+		public function getIP(): string {
+			return '127.0.0.1';
+		}
 	}
 }
 
