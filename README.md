@@ -11,7 +11,7 @@ intensive.
 | `index.php` (page views, action=history, diffs, etc.) | ✅ Always |
 | `index.php` (Special pages) | ✅ Always |
 | `api.php` (Action API modules) | ✅ Configurable via `$wgCrawlerProtectedApiModules` |
-| `rest.php` (REST API paths) | ✅ Configurable via `$wgCrawlerProtectedRestPaths` (MW 1.42+) |
+| `rest.php` (REST API paths) | ✅ Configurable via `$wgCrawlerProtectedRestPaths` (MW 1.44+) |
 
 Both `$wgCrawlerProtectedApiModules` and `$wgCrawlerProtectedRestPaths` default to
 an empty list so that upgrades do not silently break existing anonymous API
@@ -55,8 +55,9 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   request. Set to `[]` to disable this check.
 * `$wgCrawlerProtectedApiModules` - array of Action API module names to block
   for anonymous users (default: `[]`). Matches both top-level action names
-  (e.g. `'compare'`, `'parse'`) and query sub-module names (e.g. `'revisions'`,
-  `'recentchanges'`, `'backlinks'`). Matching is case-insensitive. Example that
+  (e.g. `'compare'`, `'parse'`) and the `prop`, `list`, `meta` and `generator`
+  sub-modules of `action=query` (e.g. `'revisions'`, `'recentchanges'`,
+  `'backlinks'`). Matching is case-insensitive. Example that
   protects the most common crawler-attractive modules:
   ```php
   $wgCrawlerProtectedApiModules = [ 'compare', 'parse', 'revisions', 'recentchanges', 'backlinks' ];
@@ -69,7 +70,7 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   ```php
   $wgCrawlerProtectedRestPaths = [ '/page/*/history', '/revision/*/compare/*' ];
   ```
-  REST protection requires MediaWiki 1.42 or later; the setting is silently
+  REST protection requires MediaWiki 1.44 or later; the setting is silently
   ignored on older versions.
 * `$wgCrawlerProtectionUse418` - drop denied requests in a quick way via
   `die();` with

@@ -230,6 +230,23 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	public function checkApiModule( string $moduleName, $user ): bool {
+		return $this->checkApiModules( [ $moduleName ], $user );
+	}
+
+	/**
+	 * Check whether an Action API request involving the given modules
+	 * should be blocked.
+	 *
+	 * Returns false (= deny) when any of the modules is in the configured
+	 * protected-modules list and the caller is anonymous.  Returns true
+	 * otherwise.
+	 *
+	 * @param string[] $moduleNames Module names involved in the request, i.e.
+	 *  the requested action plus, for action=query, its sub-modules
+	 * @param User $user
+	 * @return bool
+	 */
+	public function checkApiModules( array $moduleNames, $user ): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
@@ -238,7 +255,13 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		return !$this->isProtectedApiModule( $moduleName );
+		foreach ( $moduleNames as $moduleName ) {
+			if ( $this->isProtectedApiModule( $moduleName ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**

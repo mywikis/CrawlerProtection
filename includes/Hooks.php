@@ -120,11 +120,10 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	/**
 	 * Block protected Action API modules for anonymous users.
 	 *
-	 * Handler for the ApiCheckCanExecute hook, which fires for every API
-	 * module (including query sub-modules) before it is executed. Returns
-	 * false and sets an error message key to deny the request when the
-	 * module is in the configured protected list and the caller is
-	 * anonymous.
+	 * Handler for the ApiCheckCanExecute hook, which fires for the requested
+	 * action module before it is executed. Returns false and sets an error
+	 * message key to deny the request when the module is in the configured
+	 * protected list and the caller is anonymous.
 	 *
 	 * This class deliberately does not implement ApiCheckCanExecuteHook:
 	 * hook handlers are dispatched by method name, and not implementing the
@@ -137,8 +136,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 * @return bool|void False to deny execution
 	 */
 	public function onApiCheckCanExecute( $module, $user, &$message ) {
-		if ( !$this->crawlerProtectionService->checkApiModule(
-			$module->getModuleName(),
+		if ( !$this->crawlerProtectionService->checkApiModules(
+			$this->getApiModuleNames( $module ),
 			$user
 		) ) {
 			$message = 'crawlerprotection-accessdenied-text';
@@ -147,9 +146,46 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	}
 
 	/**
+	 * Collect the API module names involved in a request.
+	 *
+	 * The ApiCheckCanExecute hook only fires for the requested action, so for
+	 * action=query the requested sub-modules are read from the request
+	 * parameters in order to make them protectable by name as well.
+	 *
+	 * @param mixed $module ApiBase instance
+	 * @return string[]
+	 */
+	private function getApiModuleNames( $module ): array {
+		$names = [ $module->getModuleName() ];
+
+		if ( $names[0] !== 'query' ) {
+			return $names;
+		}
+
+		$request = $module->getMain()->getRequest();
+		foreach ( [ 'prop', 'list', 'meta', 'generator' ] as $param ) {
+			$value = $request->getVal( $param );
+			if ( $value === null || $value === '' ) {
+				continue;
+			}
+			// MediaWiki uses "\x1f" as the separator when a multi-value
+			// parameter starts with that character, and "|" otherwise.
+			$separator = substr( $value, 0, 1 ) === "\x1f" ? "\x1f" : '|';
+			foreach ( explode( $separator, $value ) as $subModule ) {
+				$subModule = trim( $subModule );
+				if ( $subModule !== '' ) {
+					$names[] = $subModule;
+				}
+			}
+		}
+
+		return $names;
+	}
+
+	/**
 	 * Block protected REST API paths for anonymous users.
 	 *
-	 * Handler for the RestCheckCanExecute hook, available on MW 1.42+. On
+	 * Handler for the RestCheckCanExecute hook, available on MW 1.44+. On
 	 * older versions the hook never fires and this method is never called,
 	 * so the REST API is unprotected there.
 	 *

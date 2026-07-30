@@ -1074,6 +1074,51 @@ class CrawlerProtectionServiceTest extends TestCase {
 	}
 
 	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesBlocksWhenAnySubModuleIsProtected() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertFalse(
+			$service->checkApiModules( [ 'query', 'links', 'revisions' ], $user )
+		);
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesAllowsWhenNoModuleIsProtected() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue(
+			$service->checkApiModules( [ 'query', 'links', 'categories' ], $user )
+		);
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 */
+	public function testCheckApiModulesAllowsRegisteredUser() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModules( [ 'query', 'revisions' ], $user ) );
+	}
+
+	/**
 	 * @covers ::checkApiModule
 	 */
 	public function testCheckApiModuleAllowsAllowedIP() {
