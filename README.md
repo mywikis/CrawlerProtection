@@ -91,6 +91,10 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   users and bypass all protection checks. Set to `true` if you do not want
   crawlers that receive a temporary account to bypass protection.
 
+The pretty denial page carries an `X-Robots-Tag: noindex,nofollow` header and
+the same robot policy as a `<meta>` tag, so that well-behaved crawlers stop
+re-requesting denied URLs.
+
 # Hooks
 
 ## CrawlerProtectionShouldDeny

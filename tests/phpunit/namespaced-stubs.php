@@ -135,6 +135,16 @@ namespace MediaWiki\Output {
 
 		public function setPageTitleMsg( $msg ) {
 		}
+
+		public function setRobotPolicy( $policy ) {
+		}
+
+		/**
+		 * @return \MediaWiki\Request\WebRequest
+		 */
+		public function getRequest() {
+			return new \MediaWiki\Request\WebRequest();
+		}
 	}
 }
 
@@ -170,6 +180,23 @@ namespace MediaWiki\Request {
 
 		public function getIP(): string {
 			return '127.0.0.1';
+		}
+
+		/**
+		 * @return WebResponse
+		 */
+		public function response() {
+			return new WebResponse();
+		}
+	}
+
+	class WebResponse {
+		/**
+		 * @param string $string
+		 * @param bool $replace
+		 * @param null|int $http_response_code
+		 */
+		public function header( $string, $replace = true, $http_response_code = null ) {
 		}
 	}
 }

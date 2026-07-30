@@ -40,6 +40,9 @@ class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
 
+	/** Robot directive sent on the pretty denial page */
+	private const ROBOT_POLICY = 'noindex,nofollow';
+
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectionUse418',
@@ -132,6 +135,8 @@ class ResponseFactory {
 	 */
 	protected function denyAccessPretty( $output ): void {
 		$output->setStatusCode( 403 );
+		$output->setRobotPolicy( self::ROBOT_POLICY );
+		$output->getRequest()->response()->header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		$output->addWikiTextAsInterface(
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()
 		);

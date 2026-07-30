@@ -4,6 +4,7 @@ namespace MediaWiki\Extension\CrawlerProtection\Tests;
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,12 +14,41 @@ class ResponseFactoryTest extends TestCase {
 	/** @var string */
 	private static string $outputPageClassName;
 
+	/** @var string */
+	private static string $webRequestClassName;
+
+	/** @var string */
+	private static string $webResponseClassName;
+
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
 
 		self::$outputPageClassName = class_exists( '\MediaWiki\Output\OutputPage' )
 			? '\MediaWiki\Output\OutputPage'
 			: '\OutputPage';
+		self::$webRequestClassName = class_exists( '\MediaWiki\Request\WebRequest' )
+			? '\MediaWiki\Request\WebRequest'
+			: '\WebRequest';
+		self::$webResponseClassName = class_exists( '\MediaWiki\Request\WebResponse' )
+			? '\MediaWiki\Request\WebResponse'
+			: '\WebResponse';
+	}
+
+	/**
+	 * Build an OutputPage mock whose getRequest()->response() is a mock too.
+	 *
+	 * @param MockObject|null &$response Receives the WebResponse mock
+	 * @return MockObject OutputPage mock
+	 */
+	private function buildOutputMock( &$response = null ) {
+		$response = $this->createMock( self::$webResponseClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'response' )->willReturn( $response );
+
+		$output = $this->createMock( self::$outputPageClassName );
+		$output->method( 'getRequest' )->willReturn( $request );
+
+		return $output;
 	}
 
 	/**
@@ -53,12 +83,36 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
-		$output = $this->createMock( self::$outputPageClassName );
+		$output = $this->buildOutputMock();
 		$output->expects( $this->once() )
 			->method( 'setStatusCode' )
 			->with( 403 );
 		$output->expects( $this->once() )
+			->method( 'setRobotPolicy' )
+			->with( 'noindex,nofollow' );
+		$output->expects( $this->once() )
 			->method( 'addWikiTextAsInterface' );
+
+		$factory = $this->buildFactory();
+		$factory->denyAccess( $output );
+	}
+
+	/**
+	 * The pretty denial must ask crawlers not to index or follow the URL.
+	 *
+	 * @covers ::denyAccessPretty
+	 */
+	public function testPrettyDenialSendsRobotsHeader() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		$output = $this->buildOutputMock( $response );
+		$response->expects( $this->once() )
+			->method( 'header' )
+			->with( 'X-Robots-Tag: noindex,nofollow' );
 
 		$factory = $this->buildFactory();
 		$factory->denyAccess( $output );
@@ -282,7 +336,7 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
-		$output = $this->createMock( self::$outputPageClassName );
+		$output = $this->buildOutputMock();
 		$output->expects( $this->once() )->method( 'setPageTitleMsg' );
 		$output->expects( $this->never() )->method( 'setPageTitle' );
 
@@ -325,6 +379,20 @@ class ResponseFactoryTest extends TestCase {
 
 			public function setPageTitle( $title ): void {
 				$this->count++;
+			}
+
+			public function setRobotPolicy( $policy ): void {
+			}
+
+			public function getRequest() {
+				return new class {
+					public function response() {
+						return new class {
+							public function header( $string, $replace = true, $code = null ) {
+							}
+						};
+					}
+				};
 			}
 
 			// Intentionally no setPageTitleMsg() to trigger the legacy branch.
