@@ -262,7 +262,7 @@ class ResponseFactoryTest extends TestCase {
 
 		// Assert
 		$this->assertSame( 'HTTP/1.0 403 Forbidden', $capturedHeader );
-		$this->assertSame( 'Mock message', $capturedBody );
+		$this->assertSame( wfMessage( 'crawlerprotection-rawdenial-text' )->inContentLanguage()->text(), $capturedBody );
 	}
 
 	/**
