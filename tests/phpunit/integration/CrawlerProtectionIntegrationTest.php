@@ -66,15 +66,18 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 	 */
 	private function overrideCrawlerProtectionConfig( array $overrides = [] ): void {
 		$defaults = [
-			'CrawlerProtectedActions'           => [ 'history' ],
-			'CrawlerProtectedSpecialPages'      => [ 'whatlinkshere', 'recentchangeslinked' ],
-			'CrawlerProtectedQueryParams'       => [ 'target' ],
-			'CrawlerProtectionAllowedIPs'       => [],
-			'CrawlerProtectionProtectRevisions' => true,
-			'CrawlerProtectionRawDenial'        => false,
-			'CrawlerProtectionUse418'           => false,
-			'CrawlerProtectionRawDenialHeader'  => 'HTTP/1.0 403 Forbidden',
-			'CrawlerProtectionRawDenialText'    => '403 Forbidden',
+			'CrawlerProtectedActions'              => [ 'history' ],
+			'CrawlerProtectedApiModules'           => [],
+			'CrawlerProtectedRestPaths'            => [],
+			'CrawlerProtectedSpecialPages'         => [ 'whatlinkshere', 'recentchangeslinked' ],
+			'CrawlerProtectedQueryParams'          => [ 'target' ],
+			'CrawlerProtectionAllowedIPs'          => [],
+			'CrawlerProtectionProtectRevisions'    => true,
+			'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			'CrawlerProtectionRawDenial'           => false,
+			'CrawlerProtectionUse418'              => false,
+			'CrawlerProtectionRawDenialHeader'     => 'HTTP/1.0 403 Forbidden',
+			'CrawlerProtectionRawDenialText'       => '',
 		];
 
 		$this->overrideConfigValues( array_merge( $defaults, $overrides ) );
