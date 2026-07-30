@@ -42,7 +42,7 @@ intensive.
   [418 I'm a teapot](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/418)
   code (default: `false`)
 
-All denial responses carry an `X-Robots-Tag: noindex,nofollow` header, and the
-pretty denial page additionally sets the same robot policy as a `<meta>` tag, so
-that well-behaved crawlers stop re-requesting denied URLs.
+The pretty denial page carries an `X-Robots-Tag: noindex,nofollow` header and
+the same robot policy as a `<meta>` tag, so that well-behaved crawlers stop
+re-requesting denied URLs.
 

@@ -40,7 +40,7 @@ class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
 
-	/** Robot directive sent on every denial response */
+	/** Robot directive sent on the pretty denial page */
 	private const ROBOT_POLICY = 'noindex,nofollow';
 
 	/** @var string[] List of constructor options this class accepts */
@@ -123,7 +123,6 @@ class ResponseFactory {
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessRaw( string $header, string $message ): void {
-		header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		header( $header );
 		die( $message );
 	}
