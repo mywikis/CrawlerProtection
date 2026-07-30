@@ -163,19 +163,27 @@ jobs:
         php: [ '8.2', '8.3', '8.4' ]
         mediawiki: [ REL1_43, REL1_44, REL1_45 ]
         include:
+          # REL1_43/PHP 8.2 also collects code coverage.
+          - os: ubuntu-latest
+            php: '8.2'
+            mediawiki: REL1_43
+            coverage: pcov
+          # REL1_39 jobs
           - os: ubuntu-latest
             php: '7.4'
             mediawiki: REL1_39
+            coverage: none
           - os: ubuntu-latest
             php: '8.2'
             mediawiki: REL1_39
+            coverage: none
     steps:
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php }}
           extensions: mbstring, intl, ast
-          coverage: none
+          coverage: ${{ matrix.coverage || 'none' }}
           tools: composer
       - name: Setup MediaWiki
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -197,4 +205,7 @@ jobs:
       - name: Install MediaWiki
         run: php maintenance/install.php --dbtype=sqlite --with-extensions --pass=UnitTestingAdminPassword519 UnitTesting WikiAdmin
       - name: Phpunit
-        run: ./vendor/bin/phpunit -- extensions/${{ env.EXTNAME }}/tests/phpunit
+        run: |
+          FLAGS=""
+          [ "${{ matrix.coverage }}" = "pcov" ] && FLAGS="--coverage-text"
+          ./vendor/bin/phpunit $FLAGS -- extensions/${{ env.EXTNAME }}/tests/phpunit
