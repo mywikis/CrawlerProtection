@@ -229,6 +229,7 @@ class ResponseFactoryTest extends TestCase {
 			public function setPageTitle( $title ): void {
 				$this->count++;
 			}
+
 			// Intentionally no setPageTitleMsg() to trigger the legacy branch.
 		};
 
