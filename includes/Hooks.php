@@ -49,10 +49,13 @@ use MediaWiki\Hook\MediaWikiPerformActionHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
 use MediaWiki\Request\WebRequest;
+use MediaWiki\Rest\HttpException;
+use MediaWiki\Rest\LocalizedHttpException;
 use MediaWiki\SpecialPage\Hook\SpecialPageBeforeExecuteHook;
 use MediaWiki\SpecialPage\SpecialPage;
 use MediaWiki\Title\Title;
 use MediaWiki\User\User;
+use Wikimedia\Message\MessageValue;
 
 /**
  * Hook handler for the CrawlerProtection extension.
@@ -112,5 +115,99 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			$special->getContext()->getOutput(),
 			$special->getContext()->getUser()
 		);
+	}
+
+	/**
+	 * Block protected Action API modules for anonymous users.
+	 *
+	 * Handler for the ApiCheckCanExecute hook, which fires for the requested
+	 * action module before it is executed. Returns false and sets an error
+	 * message key to deny the request when the module is in the configured
+	 * protected list and the caller is anonymous.
+	 *
+	 * This class deliberately does not implement ApiCheckCanExecuteHook:
+	 * hook handlers are dispatched by method name, and not implementing the
+	 * interface keeps the handler usable across supported MediaWiki
+	 * versions without redeclaring core interfaces.
+	 *
+	 * @param mixed $module ApiBase instance
+	 * @param mixed $user User object
+	 * @param string|mixed &$message Error message key set on denial
+	 * @return bool|void False to deny execution
+	 */
+	public function onApiCheckCanExecute( $module, $user, &$message ) {
+		if ( !$this->crawlerProtectionService->checkApiModules(
+			$this->getApiModuleNames( $module ),
+			$user
+		) ) {
+			$message = 'crawlerprotection-accessdenied-text';
+			return false;
+		}
+	}
+
+	/**
+	 * Collect the API module names involved in a request.
+	 *
+	 * The ApiCheckCanExecute hook only fires for the requested action, so for
+	 * action=query the requested sub-modules are read from the request
+	 * parameters in order to make them protectable by name as well.
+	 *
+	 * @param mixed $module ApiBase instance
+	 * @return string[]
+	 */
+	private function getApiModuleNames( $module ): array {
+		$names = [ $module->getModuleName() ];
+
+		if ( $names[0] !== 'query' ) {
+			return $names;
+		}
+
+		$request = $module->getMain()->getRequest();
+		foreach ( [ 'prop', 'list', 'meta', 'generator' ] as $param ) {
+			$value = $request->getVal( $param );
+			if ( $value === null || $value === '' ) {
+				continue;
+			}
+			// MediaWiki uses "\x1f" as the separator when a multi-value
+			// parameter starts with that character, and "|" otherwise.
+			$separator = substr( $value, 0, 1 ) === "\x1f" ? "\x1f" : '|';
+			foreach ( explode( $separator, $value ) as $subModule ) {
+				$subModule = trim( $subModule );
+				if ( $subModule !== '' ) {
+					$names[] = $subModule;
+				}
+			}
+		}
+
+		return $names;
+	}
+
+	/**
+	 * Block protected REST API paths for anonymous users.
+	 *
+	 * Handler for the RestCheckCanExecute hook, available on MW 1.44+. On
+	 * older versions the hook never fires and this method is never called,
+	 * so the REST API is unprotected there.
+	 *
+	 * As with onApiCheckCanExecute, RestCheckCanExecuteHook is deliberately
+	 * not implemented so the class loads on MediaWiki versions that do not
+	 * ship that interface.
+	 *
+	 * @param mixed $module REST Module instance
+	 * @param mixed $handler REST Handler instance
+	 * @param string $path The request path (e.g. "/page/Main_Page/history")
+	 * @param mixed $request PSR-7 request
+	 * @param HttpException|null &$error Set to an HttpException to deny the request
+	 * @return bool|void False to deny execution
+	 */
+	public function onRestCheckCanExecute( $module, $handler, string $path, $request, &$error ) {
+		$user = $handler->getAuthority()->getUser();
+		if ( !$this->crawlerProtectionService->checkRestPath( $path, $user ) ) {
+			$error = new LocalizedHttpException(
+				MessageValue::new( 'crawlerprotection-accessdenied-text' ),
+				403
+			);
+			return false;
+		}
 	}
 }

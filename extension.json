@@ -1,7 +1,7 @@
 {
     "name": "CrawlerProtection",
     "author": "[https://mywikis.com MyWikis LLC]",
-    "version": "1.6.1",
+    "version": "1.7.0",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
     "descriptionmsg": "crawlerprotection-desc",
     "type": "hook",
@@ -20,7 +20,9 @@
         }
     },
     "Hooks": {
+        "ApiCheckCanExecute": "main",
         "MediaWikiPerformAction": "main",
+        "RestCheckCanExecute": "main",
         "SpecialPageBeforeExecute": "main"
     },
     "config": {
@@ -28,6 +30,10 @@
             "value": [
                 "history"
             ],
+            "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectedApiModules": {
+            "value": [],
             "merge_strategy": "provide_default"
         },
         "CrawlerProtectedSpecialPages": {
@@ -42,6 +48,10 @@
             "value": [
                 "target"
             ],
+            "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectedRestPaths": {
+            "value": [],
             "merge_strategy": "provide_default"
         },
         "CrawlerProtectionRawDenial": {
