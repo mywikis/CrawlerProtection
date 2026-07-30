@@ -197,6 +197,103 @@ class ResponseFactoryTest extends TestCase {
 	}
 
 	/**
+	 * When CrawlerProtectionRawDenialText is empty, denyAccess must fall back
+	 * to the i18n message for the raw-denial body instead of passing an empty
+	 * string to denyAccessRaw.
+	 *
+	 * @covers ::denyAccess
+	 */
+	public function testDenyAccessRawUsesI18nWhenOverrideIsEmpty() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		// Arrange
+		$capturedHeader = null;
+		$capturedBody = null;
+
+		$factory = $this->getMockBuilder( ResponseFactory::class )
+			->setConstructorArgs( [
+				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
+					'CrawlerProtectionUse418' => false,
+					'CrawlerProtectionRawDenial' => true,
+					'CrawlerProtectionRawDenialHeader' => 'HTTP/1.0 403 Forbidden',
+					'CrawlerProtectionRawDenialText' => '',
+				] )
+			] )
+			->onlyMethods( [ 'denyAccessRaw' ] )
+			->getMock();
+
+		$factory->method( 'denyAccessRaw' )
+			->willReturnCallback(
+				static function ( string $header, string $message ) use ( &$capturedHeader, &$capturedBody ) {
+					$capturedHeader = $header;
+					$capturedBody = $message;
+				}
+			);
+
+		$output = $this->createMock( self::$outputPageClassName );
+
+		// Act
+		$factory->denyAccess( $output );
+
+		// Assert
+		$this->assertSame( 'HTTP/1.0 403 Forbidden', $capturedHeader );
+		$this->assertSame( 'Mock message', $capturedBody );
+	}
+
+	/**
+	 * When both Use418 and RawDenial are enabled, denyAccess should produce a
+	 * 418 response whose body comes from the i18n teapot message rather than a
+	 * hardcoded string.
+	 *
+	 * @covers ::denyAccess
+	 * @covers ::denyAccessWith418
+	 */
+	public function testDenyAccessWith418UsesI18nMessage() {
+		if ( defined( 'MEDIAWIKI' ) ) {
+			$this->markTestSkipped(
+				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
+			);
+		}
+
+		// Arrange
+		$capturedHeader = null;
+		$capturedBody = null;
+
+		$factory = $this->getMockBuilder( ResponseFactory::class )
+			->setConstructorArgs( [
+				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
+					'CrawlerProtectionUse418' => true,
+					'CrawlerProtectionRawDenial' => true,
+					'CrawlerProtectionRawDenialHeader' => '',
+					'CrawlerProtectionRawDenialText' => '',
+				] )
+			] )
+			->onlyMethods( [ 'denyAccessRaw' ] )
+			->getMock();
+
+		$factory->method( 'denyAccessRaw' )
+			->willReturnCallback(
+				static function ( string $header, string $message ) use ( &$capturedHeader, &$capturedBody ) {
+					$capturedHeader = $header;
+					$capturedBody = $message;
+				}
+			);
+
+		$output = $this->createMock( self::$outputPageClassName );
+
+		// Act
+		$factory->denyAccess( $output );
+
+		// Assert
+		$this->assertSame( 'HTTP/1.0 418 I\'m a teapot', $capturedHeader );
+		$this->assertSame( 'Mock message', $capturedBody );
+	}
+
+	/**
 	 * @covers ::__construct
 	 */
 	public function testConstructorAcceptsValidOptions() {
