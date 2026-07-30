@@ -38,6 +38,7 @@ if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
 
 if ( version_compare( MW_VERSION, '1.42', '<' ) ) {
 	class_alias( '\MediaWiki', '\MediaWiki\Actions\ActionEntryPoint' );
+	class_alias( '\RequestContext', '\MediaWiki\Context\RequestContext' );
 }
 
 if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
@@ -45,6 +46,7 @@ if ( version_compare( MW_VERSION, '1.44', '<' ) ) {
 }
 
 use MediaWiki\Actions\ActionEntryPoint;
+use MediaWiki\Context\RequestContext;
 use MediaWiki\Hook\MediaWikiPerformActionHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Page\Article;
@@ -139,7 +141,8 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	public function onApiCheckCanExecute( $module, $user, &$message ) {
 		if ( !$this->crawlerProtectionService->checkApiModules(
 			$this->getApiModuleNames( $module ),
-			$user
+			$user,
+			$module->getMain()->getRequest()
 		) ) {
 			$message = 'crawlerprotection-accessdenied-text';
 			return false;
@@ -203,7 +206,15 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	 */
 	public function onRestCheckCanExecute( $module, $handler, string $path, $request, &$error ) {
 		$user = $handler->getAuthority()->getUser();
-		if ( !$this->crawlerProtectionService->checkRestPath( $path, $user ) ) {
+		// The REST RequestInterface exposes no canonical client IP, so the
+		// WebRequest of the current context is used instead: it applies the
+		// wiki's trusted-proxy / X-Forwarded-For handling, matching the
+		// behaviour of the index.php and api.php entry points.
+		if ( !$this->crawlerProtectionService->checkRestPath(
+			$path,
+			$user,
+			RequestContext::getMain()->getRequest()
+		) ) {
 			$error = new LocalizedHttpException(
 				MessageValue::new( 'crawlerprotection-accessdenied-text' ),
 				403

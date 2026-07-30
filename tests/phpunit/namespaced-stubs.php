@@ -201,6 +201,24 @@ namespace MediaWiki\Request {
 	}
 }
 
+namespace MediaWiki\Context {
+	class RequestContext {
+		/**
+		 * @return self
+		 */
+		public static function getMain(): self {
+			return new self();
+		}
+
+		/**
+		 * @return \MediaWiki\Request\WebRequest
+		 */
+		public function getRequest() {
+			return new \MediaWiki\Request\WebRequest();
+		}
+	}
+}
+
 namespace MediaWiki\Title {
 	class Title {
 	}

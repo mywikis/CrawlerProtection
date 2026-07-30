@@ -288,10 +288,12 @@ class CrawlerProtectionService {
 	 *
 	 * @param string $moduleName The canonical module name (e.g. "revisions", "compare")
 	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
 	 * @return bool
 	 */
-	public function checkApiModule( string $moduleName, $user ): bool {
-		return $this->checkApiModules( [ $moduleName ], $user );
+	public function checkApiModule( string $moduleName, $user, $request = null ): bool {
+		return $this->checkApiModules( [ $moduleName ], $user, $request );
 	}
 
 	/**
@@ -305,14 +307,16 @@ class CrawlerProtectionService {
 	 * @param string[] $moduleNames Module names involved in the request, i.e.
 	 *  the requested action plus, for action=query, its sub-modules
 	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
 	 * @return bool
 	 */
-	public function checkApiModules( array $moduleNames, $user ): bool {
+	public function checkApiModules( array $moduleNames, $user, $request = null ): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) || $this->isIPAllowed( $user->getName() ) ) {
+		if ( $this->isUserAllowed( $user ) || $this->isRequestIPAllowed( $request ) ) {
 			return true;
 		}
 
@@ -351,14 +355,16 @@ class CrawlerProtectionService {
 	 *
 	 * @param string $path The request path (e.g. "/page/Main_Page/history")
 	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
 	 * @return bool
 	 */
-	public function checkRestPath( string $path, $user ): bool {
+	public function checkRestPath( string $path, $user, $request = null ): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
 
-		if ( $this->isUserAllowed( $user ) || $this->isIPAllowed( $user->getName() ) ) {
+		if ( $this->isUserAllowed( $user ) || $this->isRequestIPAllowed( $request ) ) {
 			return true;
 		}
 
@@ -427,11 +433,18 @@ class CrawlerProtectionService {
 	 * The canonical client IP is taken from WebRequest (which correctly applies
 	 * trusted-proxy / X-Forwarded-For handling) rather than the username.
 	 *
-	 * @param WebRequest $request
+	 * A null request (for example when an entry point cannot supply one) is
+	 * never allowed through, so the regular protection logic applies.
+	 *
+	 * @param WebRequest|null $request
 	 * @return bool
 	 */
 	private function isRequestIPAllowed( $request ): bool {
-		return $this->normalizedAllowedIPs !== [] && $this->isIPAllowed( $request->getIP() );
+		if ( $request === null || $this->normalizedAllowedIPs === [] ) {
+			return false;
+		}
+
+		return $this->isIPAllowed( $request->getIP() );
 	}
 
 	/**

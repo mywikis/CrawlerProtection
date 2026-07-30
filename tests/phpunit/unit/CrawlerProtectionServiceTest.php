@@ -1416,12 +1416,34 @@ class CrawlerProtectionServiceTest extends TestCase {
 	public function testCheckApiModuleAllowsAllowedIP() {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
+		// The username must never be used to resolve the client IP.
+		$user->expects( $this->never() )->method( 'getName' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [ '1.2.3.4' ], null, true, [], false, [ 'revisions' ]
+		);
+		$this->assertTrue( $service->checkApiModule( 'revisions', $user, $request ) );
+	}
+
+	/**
+	 * Without a request the allowlist cannot be evaluated, so a protected
+	 * module stays protected rather than being allowed by a username that
+	 * happens to look like an allowlisted IP.
+	 *
+	 * @covers ::checkApiModule
+	 */
+	public function testCheckApiModuleDeniesWhenNoRequestGiven() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
 		$user->method( 'getName' )->willReturn( '1.2.3.4' );
 
 		$service = $this->buildService(
 			[], [], [ '1.2.3.4' ], null, true, [], false, [ 'revisions' ]
 		);
-		$this->assertTrue( $service->checkApiModule( 'revisions', $user ) );
+		$this->assertFalse( $service->checkApiModule( 'revisions', $user ) );
 	}
 
 	// ---------------------------------------------------------------
@@ -1558,12 +1580,34 @@ class CrawlerProtectionServiceTest extends TestCase {
 	public function testCheckRestPathAllowsAllowedIP() {
 		$user = $this->createMock( self::$userClassName );
 		$user->method( 'isRegistered' )->willReturn( false );
+		// The username must never be used to resolve the client IP.
+		$user->expects( $this->never() )->method( 'getName' );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ]
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
+	}
+
+	/**
+	 * Without a request the allowlist cannot be evaluated, so a protected
+	 * path stays protected rather than being allowed by a username that
+	 * happens to look like an allowlisted IP.
+	 *
+	 * @covers ::checkRestPath
+	 */
+	public function testCheckRestPathDeniesWhenNoRequestGiven() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
 		$user->method( 'getName' )->willReturn( '1.2.3.4' );
 
 		$service = $this->buildService(
 			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ]
 		);
-		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user ) );
+		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user ) );
 	}
 
 	// ---------------------------------------------------------------

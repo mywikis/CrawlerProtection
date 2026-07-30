@@ -280,7 +280,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkApiModules' )
-			->with( [ 'compare' ], $user )
+			->with( [ 'compare' ], $user, $module->getMain()->getRequest() )
 			->willReturn( false );
 
 		$hooks = new Hooks( $service );
@@ -433,7 +433,7 @@ class HooksTest extends TestCase {
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
 			->method( 'checkRestPath' )
-			->with( '/page/Main_Page/history', $user )
+			->with( '/page/Main_Page/history', $user, $this->isInstanceOf( self::$webRequestClassName ) )
 			->willReturn( false );
 
 		$hooks = new Hooks( $service );

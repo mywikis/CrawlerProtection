@@ -82,7 +82,8 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   (`'1.2.3.0/24'`, `'2001:db8::/32'`), and explicit ranges
   (`'1.2.3.1 - 1.2.3.10'`). The client IP is resolved via `WebRequest::getIP()`,
   which correctly handles trusted-proxy and `X-Forwarded-For` headers consistent
-  with the rest of MediaWiki.
+  with the rest of MediaWiki. The same resolution is used for `index.php`,
+  `api.php` and `rest.php` requests.
 * `$wgCrawlerProtectionTreatTempUsersAsAnon` - when `true`, users with
   [temporary accounts](https://www.mediawiki.org/wiki/Help:Temporary_accounts)
   (`$wgAutoCreateTempUser`, available since MediaWiki 1.42) are treated as

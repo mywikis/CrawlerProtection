@@ -77,12 +77,6 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessPretty
 	 */
 	public function testDenyAccessPrettySetStatusCode() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
-		}
-
 		$output = $this->buildOutputMock();
 		$output->expects( $this->once() )
 			->method( 'setStatusCode' )
@@ -103,12 +97,6 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessPretty
 	 */
 	public function testPrettyDenialSendsRobotsHeader() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
-		}
-
 		$output = $this->buildOutputMock( $response );
 		$response->expects( $this->once() )
 			->method( 'header' )
@@ -225,12 +213,6 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccess
 	 */
 	public function testDenyAccessRawUsesI18nWhenOverrideIsEmpty() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
-		}
-
 		// Arrange
 		$capturedHeader = null;
 		$capturedBody = null;
@@ -262,7 +244,10 @@ class ResponseFactoryTest extends TestCase {
 
 		// Assert
 		$this->assertSame( 'HTTP/1.0 403 Forbidden', $capturedHeader );
-		$this->assertSame( wfMessage( 'crawlerprotection-rawdenial-text' )->inContentLanguage()->text(), $capturedBody );
+		$this->assertSame(
+			wfMessage( 'crawlerprotection-rawdenial-text' )->inContentLanguage()->text(),
+			$capturedBody
+		);
 	}
 
 	/**
@@ -274,12 +259,6 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessWith418
 	 */
 	public function testDenyAccessWith418UsesI18nMessage() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
-		}
-
 		// Arrange
 		$capturedHeader = null;
 		$capturedBody = null;
@@ -311,7 +290,10 @@ class ResponseFactoryTest extends TestCase {
 
 		// Assert
 		$this->assertSame( 'HTTP/1.0 418 I\'m a teapot', $capturedHeader );
-		$this->assertSame( 'Mock message', $capturedBody );
+		$this->assertSame(
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text(),
+			$capturedBody
+		);
 	}
 
 	/**
@@ -330,10 +312,8 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessPretty
 	 */
 	public function testDenyAccessPrettyCallsSetPageTitleMsgOnModernOutputPage() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
+		if ( !method_exists( self::$outputPageClassName, 'setPageTitleMsg' ) ) {
+			$this->markTestSkipped( 'OutputPage::setPageTitleMsg() requires MediaWiki 1.41+' );
 		}
 
 		$output = $this->buildOutputMock();
@@ -354,12 +334,6 @@ class ResponseFactoryTest extends TestCase {
 	 * @covers ::denyAccessPretty
 	 */
 	public function testDenyAccessPrettyFallsBackToSetPageTitleOnLegacyOutputPage() {
-		if ( defined( 'MEDIAWIKI' ) ) {
-			$this->markTestSkipped(
-				'Skipped in MediaWiki integration environment: wfMessage() requires service container'
-			);
-		}
-
 		$setPageTitleCallCount = 0;
 
 		// Anonymous class without setPageTitleMsg() simulates MW < 1.41 OutputPage.
