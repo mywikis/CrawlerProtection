@@ -74,6 +74,7 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			'CrawlerProtectionAllowedIPs'          => [],
 			'CrawlerProtectionProtectRevisions'    => true,
 			'CrawlerProtectionTreatTempUsersAsAnon' => false,
+			'CrawlerProtectionTrustXForwardedFor'  => false,
 			'CrawlerProtectionRawDenial'           => false,
 			'CrawlerProtectionUse418'              => false,
 			'CrawlerProtectionRawDenialHeader'     => 'HTTP/1.0 403 Forbidden',
@@ -311,6 +312,98 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		$result = $service->checkPerformAction( $output, $user, $request );
 
 		$this->assertTrue( $result, 'checkPerformAction must return true for registered users' );
+	}
+
+	// ---------------------------------------------------------------
+	// X-Forwarded-For allowlist
+	// ---------------------------------------------------------------
+
+	/**
+	 * Build a request that reaches the wiki through a reverse proxy: the
+	 * connecting address is the proxy, and the client address is reported in
+	 * the X-Forwarded-For header.
+	 *
+	 * A real WebRequest is used so that the header lookup exercises
+	 * MediaWiki's own getHeader() implementation.
+	 *
+	 * @param array $params Query parameters
+	 * @param string $forwardedFor X-Forwarded-For header value
+	 * @param string $proxyIP Connecting (proxy) address
+	 * @return \MediaWiki\Request\FauxRequest|\FauxRequest
+	 */
+	private function makeProxiedRequest(
+		array $params,
+		string $forwardedFor,
+		string $proxyIP = '10.0.0.1'
+	) {
+		$request = $this->makeRequest( $params );
+		$request->setIP( $proxyIP );
+		$request->setHeaders( [ 'X-Forwarded-For' => $forwardedFor ] );
+
+		return $request;
+	}
+
+	/**
+	 * Behind a reverse proxy that is not registered in $wgCdnServersNoPurge,
+	 * WebRequest::getIP() reports the proxy address, so an allowlisted client
+	 * is still blocked while CrawlerProtectionTrustXForwardedFor is off.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkPerformAction
+	 */
+	public function testForwardedIPIsIgnoredWhenTrustDisabled(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedActions'      => [ 'history' ],
+			'CrawlerProtectionAllowedIPs'  => [ '1.2.3.4' ],
+		] );
+
+		$service = $this->makeWebModeService();
+		$request = $this->makeProxiedRequest( [ 'action' => 'history' ], '1.2.3.4' );
+
+		$this->assertFalse(
+			$service->checkPerformAction( $this->makeOutputPage(), $this->makeAnonUser(), $request )
+		);
+	}
+
+	/**
+	 * With CrawlerProtectionTrustXForwardedFor enabled, the address reported
+	 * by the proxy is matched against the allowlist.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkPerformAction
+	 */
+	public function testForwardedIPIsAllowedWhenTrustEnabled(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedActions'             => [ 'history' ],
+			'CrawlerProtectionAllowedIPs'         => [ '1.2.3.4' ],
+			'CrawlerProtectionTrustXForwardedFor' => true,
+		] );
+
+		$service = $this->makeWebModeService();
+		$request = $this->makeProxiedRequest( [ 'action' => 'history' ], '1.2.3.4' );
+
+		$this->assertTrue(
+			$service->checkPerformAction( $this->makeOutputPage(), $this->makeAnonUser(), $request )
+		);
+	}
+
+	/**
+	 * Entries a client prepends to the header must never be trusted: only the
+	 * address appended by the proxy (the last entry) is matched.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkPerformAction
+	 */
+	public function testSpoofedForwardedChainIsRejected(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedActions'             => [ 'history' ],
+			'CrawlerProtectionAllowedIPs'         => [ '1.2.3.4' ],
+			'CrawlerProtectionTrustXForwardedFor' => true,
+		] );
+
+		$service = $this->makeWebModeService();
+		$request = $this->makeProxiedRequest( [ 'action' => 'history' ], '1.2.3.4, 203.0.113.9' );
+
+		$this->assertFalse(
+			$service->checkPerformAction( $this->makeOutputPage(), $this->makeAnonUser(), $request )
+		);
 	}
 
 	// ---------------------------------------------------------------

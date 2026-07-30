@@ -183,6 +183,15 @@ namespace MediaWiki\Request {
 		}
 
 		/**
+		 * @param string $name
+		 * @param int $flags
+		 * @return string|false
+		 */
+		public function getHeader( $name, $flags = 0 ) {
+			return false;
+		}
+
+		/**
 		 * @return WebResponse
 		 */
 		public function response() {

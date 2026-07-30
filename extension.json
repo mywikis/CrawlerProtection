@@ -75,6 +75,9 @@
         },
         "CrawlerProtectionTreatTempUsersAsAnon": {
             "value": false
+        },
+        "CrawlerProtectionTrustXForwardedFor": {
+            "value": false
         }
     },
     "ServiceWiringFiles": [

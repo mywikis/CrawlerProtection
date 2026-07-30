@@ -91,10 +91,54 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   When `false` (default), temporary-account users are treated as registered
   users and bypass all protection checks. Set to `true` if you do not want
   crawlers that receive a temporary account to bypass protection.
+* `$wgCrawlerProtectionTrustXForwardedFor` - when `true`, the IP allowlist also
+  matches against the address reported in the `X-Forwarded-For` header
+  (default: `false`). See
+  [Wikis behind a reverse proxy](#wikis-behind-a-reverse-proxy) below; only
+  enable this after reading that section.
 
 The pretty denial page carries an `X-Robots-Tag: noindex,nofollow` header and
 the same robot policy as a `<meta>` tag, so that well-behaved crawlers stop
 re-requesting denied URLs.
+
+## Wikis behind a reverse proxy
+
+When the wiki sits behind a reverse proxy such as HAProxy, nginx or Varnish,
+every request reaches PHP from the proxy's address. `WebRequest::getIP()` only
+follows `X-Forwarded-For` for proxies MediaWiki has been told to trust, so
+until the proxy is declared, `$wgCrawlerProtectionAllowedIPs` (and MediaWiki's
+own blocking, rate limiting and `CheckUser` data) sees the proxy address
+instead of the visitor's.
+
+The correct fix is a one-line MediaWiki setting rather than an Apache or
+extension change - declare the proxy in `LocalSettings.php`:
+
+```php
+$wgCdnServersNoPurge = [ '10.0.0.1' ]; // HAProxy address or CIDR range
+```
+
+Do this whenever you can: it fixes the client IP wiki-wide, for every feature,
+not just for this extension. (Add `$wgUsePrivateIPs = true;` as well if the
+visitors you want to allowlist use private addresses.)
+
+For wikis that cannot change that setting, this extension offers a narrower
+opt-in fallback that applies to the allowlist only:
+
+```php
+$wgCrawlerProtectionTrustXForwardedFor = true;
+```
+
+With it enabled, when the connecting address does not match
+`$wgCrawlerProtectionAllowedIPs` the *last* entry of `X-Forwarded-For` is
+checked as well. Only the last entry is used, because a reverse proxy appends
+the address it observed to the end of the chain; any earlier entries may have
+been sent by the client. Nothing else in MediaWiki is affected, and the header
+can never cause a request to be denied - only allowlisted.
+
+**Only enable this if every request reaches the wiki through exactly one
+reverse proxy that sets or appends `X-Forwarded-For`.** If the web server is
+also reachable directly, or if there are several proxy hops, a client can
+forge the header and bypass protection by claiming an allowlisted address.
 
 # Hooks
 

@@ -53,6 +53,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param array $protectedRestPaths
 	 * @param bool $treatTempUsersAsAnon
 	 * @param callable[] $shouldDenyHandlers Handlers for CrawlerProtectionShouldDeny
+	 * @param bool $trustXForwardedFor
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
@@ -66,7 +67,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		array $protectedApiModules = [],
 		array $protectedRestPaths = [],
 		bool $treatTempUsersAsAnon = false,
-		array $shouldDenyHandlers = []
+		array $shouldDenyHandlers = [],
+		bool $trustXForwardedFor = false
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
@@ -79,6 +81,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
 				'CrawlerProtectionTreatTempUsersAsAnon' => $treatTempUsersAsAnon,
+				'CrawlerProtectionTrustXForwardedFor' => $trustXForwardedFor,
 			]
 		);
 
@@ -1051,6 +1054,216 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[ 'WhatLinksHere' ], [], [ '1.2.3.4' ], $responseFactory
 		);
 		$this->assertTrue( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// X-Forwarded-For allowlist tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * Build an anonymous request whose canonical IP is the reverse proxy and
+	 * whose X-Forwarded-For header carries the given value.
+	 *
+	 * @param string|false $forwardedFor Header value, or false when absent
+	 * @param string $proxyIP Address WebRequest::getIP() resolves to
+	 * @return \PHPUnit\Framework\MockObject\MockObject WebRequest mock
+	 */
+	private function makeProxiedRequest( $forwardedFor, string $proxyIP = '10.0.0.1' ) {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( $proxyIP );
+		$request->method( 'getHeader' )->willReturn( $forwardedFor );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		return $request;
+	}
+
+	/**
+	 * Behind a reverse proxy that MediaWiki does not know about, the canonical
+	 * IP is the proxy's own address, so an allowlisted client is blocked unless
+	 * CrawlerProtectionTrustXForwardedFor is enabled.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPIsIgnoredWhenTrustDisabled() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->makeProxiedRequest( '1.2.3.4' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService( [], [ 'history' ], [ '1.2.3.4' ], $responseFactory );
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPIsAllowedWhenTrustEnabled() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->makeProxiedRequest( '1.2.3.4' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '1.2.3.4' ], $responseFactory, true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * CIDR and explicit ranges must work for forwarded addresses too.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPMatchesAllowedRange() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->makeProxiedRequest( '2001:0db8:85a3::7344' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '2001:0db8:85a3::/96' ], $responseFactory,
+			true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * Only the address appended by the reverse proxy (the last entry) counts.
+	 * A client that prepends an allowlisted address to spoof the header must
+	 * still be blocked.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPIgnoresClientSuppliedChainEntries() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		// The client claimed to be 1.2.3.4; the proxy appended the address it saw.
+		$request = $this->makeProxiedRequest( '1.2.3.4, 203.0.113.9' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '1.2.3.4' ], $responseFactory, true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * @covers ::checkPerformAction
+	 * @dataProvider provideUnusableForwardedForHeaders
+	 *
+	 * @param string|false $forwardedFor
+	 */
+	public function testUnusableForwardedForHeaderDenies( $forwardedFor ) {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->makeProxiedRequest( $forwardedFor );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '1.2.3.4' ], $responseFactory, true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	public function provideUnusableForwardedForHeaders(): array {
+		return [
+			'header absent' => [ false ],
+			'empty header' => [ '' ],
+			'whitespace only' => [ '   ' ],
+			'not an IP address' => [ 'unknown' ],
+			'range instead of address' => [ '1.2.3.0/24' ],
+			'trailing separator' => [ '1.2.3.4,' ],
+		];
+	}
+
+	/**
+	 * The forwarded address is only consulted when the canonical IP does not
+	 * already match, and never allows a request the allowlist does not cover.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPDoesNotOverrideAllowedCanonicalIP() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		// Canonical IP is allowlisted, forwarded address is not.
+		$request = $this->makeProxiedRequest( '203.0.113.9', '1.2.3.4' );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'denyAccess' );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [ '1.2.3.4' ], $responseFactory, true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertTrue( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * An empty allowlist short-circuits before the header is read, so enabling
+	 * the toggle alone can never let a request through.
+	 *
+	 * @covers ::checkPerformAction
+	 */
+	public function testForwardedIPIsNotConsultedWithEmptyAllowlist() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getIP' )->willReturn( '10.0.0.1' );
+		$request->expects( $this->never() )->method( 'getHeader' );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'type', null, 'revision' ],
+		] );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$service = $this->buildService(
+			[], [ 'history' ], [], $responseFactory, true, [ 'target' ], false, [], [], false, [], true
+		);
+		$this->assertFalse( $service->checkPerformAction( $output, $user, $request ) );
+	}
+
+	/**
+	 * The REST entry point resolves the allowlist through the same request, so
+	 * the forwarded address applies there as well.
+	 *
+	 * @covers ::checkRestPath
+	 */
+	public function testForwardedIPAppliesToRestPaths() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$request = $this->makeProxiedRequest( '1.2.3.4' );
+
+		$service = $this->buildService(
+			[], [], [ '1.2.3.4' ], null, true, [], false, [], [ '/page/*/history' ], false, [], true
+		);
+		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
 	}
 
 	// ---------------------------------------------------------------

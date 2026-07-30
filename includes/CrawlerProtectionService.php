@@ -55,6 +55,7 @@ class CrawlerProtectionService {
 		'CrawlerProtectionAllowedIPs',
 		'CrawlerProtectionProtectRevisions',
 		'CrawlerProtectionTreatTempUsersAsAnon',
+		'CrawlerProtectionTrustXForwardedFor',
 	];
 
 	/** @var ServiceOptions */
@@ -433,6 +434,10 @@ class CrawlerProtectionService {
 	 * The canonical client IP is taken from WebRequest (which correctly applies
 	 * trusted-proxy / X-Forwarded-For handling) rather than the username.
 	 *
+	 * When CrawlerProtectionTrustXForwardedFor is enabled, the address reported
+	 * by the reverse proxy in X-Forwarded-For is consulted as well, for wikis
+	 * whose proxy is not registered in $wgCdnServersNoPurge.
+	 *
 	 * A null request (for example when an entry point cannot supply one) is
 	 * never allowed through, so the regular protection logic applies.
 	 *
@@ -444,7 +449,58 @@ class CrawlerProtectionService {
 			return false;
 		}
 
-		return $this->isIPAllowed( $request->getIP() );
+		if ( $this->isIPAllowed( $request->getIP() ) ) {
+			return true;
+		}
+
+		$forwardedIP = $this->getForwardedIP( $request );
+
+		return $forwardedIP !== null && $this->isIPAllowed( $forwardedIP );
+	}
+
+	/**
+	 * Resolve the client address reported by the immediate reverse proxy in the
+	 * X-Forwarded-For header, or null when it is unavailable or not trusted.
+	 *
+	 * MediaWiki only follows X-Forwarded-For for proxies that are registered as
+	 * trusted (see $wgCdnServers / $wgCdnServersNoPurge), so behind an
+	 * unregistered proxy such as HAProxy WebRequest::getIP() returns the proxy's
+	 * own address. Registering the proxy remains the correct fix; this opt-in
+	 * fallback covers wikis that cannot do so.
+	 *
+	 * Only the *last* entry of the header is used. A reverse proxy appends the
+	 * address it observed to the end of the chain, so earlier entries may have
+	 * been supplied by the client and must never be trusted. This still assumes
+	 * that every request reaches the wiki through exactly one such proxy, which
+	 * is why the behaviour is disabled by default.
+	 *
+	 * @param WebRequest $request
+	 * @return string|null Sanitized IP address, or null if none can be trusted
+	 */
+	private function getForwardedIP( $request ): ?string {
+		if ( !$this->options->get( 'CrawlerProtectionTrustXForwardedFor' ) ) {
+			return null;
+		}
+
+		$forwardedFor = $request->getHeader( 'X-Forwarded-For' );
+		if ( !is_string( $forwardedFor ) || trim( $forwardedFor ) === '' ) {
+			return null;
+		}
+
+		$chain = explode( ',', $forwardedFor );
+		$candidate = trim( (string)end( $chain ) );
+		if ( $candidate === '' ) {
+			return null;
+		}
+
+		// canonicalize() rejects anything that is not a single IP address,
+		// returning null (older releases returned false).
+		$canonical = IPUtils::canonicalize( $candidate );
+		if ( !is_string( $canonical ) || $canonical === '' ) {
+			return null;
+		}
+
+		return IPUtils::sanitizeIP( $canonical );
 	}
 
 	/**
