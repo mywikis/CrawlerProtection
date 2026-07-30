@@ -20,11 +20,29 @@ if ( !function_exists( 'wfMessage' ) ) {
 	function wfMessage( $key ) {
 		return new class() {
 			/**
+			 * Return self for chained calls
+			 *
+			 * @return static
+			 */
+			public function inContentLanguage() {
+				return $this;
+			}
+
+			/**
 			 * Return plain text version of message
 			 *
 			 * @return string
 			 */
 			public function plain() {
+				return 'Mock message';
+			}
+
+			/**
+			 * Return text version of message
+			 *
+			 * @return string
+			 */
+			public function text() {
 				return 'Mock message';
 			}
 		};
