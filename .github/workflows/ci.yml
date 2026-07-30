@@ -48,6 +48,15 @@ jobs:
           HEAD_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: .github/scripts/check-version-bump.sh "$BASE_REVISION" "$HEAD_REVISION"
 
+  i18n:
+    name: i18n Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Extension
+        uses: actions/checkout@v4
+      - name: Check qqq.json completeness
+        run: .github/scripts/check-i18n-qqq.sh
+
   style:
     name: Code Style
     runs-on: ${{ matrix.os }}

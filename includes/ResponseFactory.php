@@ -39,7 +39,6 @@ use MediaWiki\Output\OutputPage;
 class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
-	private const TEAPOT_BODY = 'I\'m a teapot';
 
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
@@ -73,15 +72,23 @@ class ResponseFactory {
 	 *
 	 * @param OutputPage $output Used only for the "pretty" strategy
 	 * @return void
+	 * @suppress SecurityCheck-XSS The raw body comes from wiki configuration
+	 *  or from an interface message, both of which are trusted sources.
 	 */
 	public function denyAccess( $output ): void {
 		if ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
 			if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
 				$this->denyAccessWith418();
 			} else {
+				$rawText = $this->options->get( 'CrawlerProtectionRawDenialText' );
+				if ( $rawText === '' ) {
+					$rawText = wfMessage( 'crawlerprotection-rawdenial-text' )
+						->inContentLanguage()
+						->text();
+				}
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
-					$this->options->get( 'CrawlerProtectionRawDenialText' )
+					$rawText
 				);
 			}
 		} else {
@@ -94,9 +101,14 @@ class ResponseFactory {
 	 *
 	 * @return void
 	 * @suppress PhanPluginNeverReturnMethod
+	 * @suppress SecurityCheck-XSS The body comes from an interface message,
+	 *  which is a trusted source.
 	 */
 	protected function denyAccessWith418(): void {
-		$this->denyAccessRaw( self::TEAPOT_HEADER, self::TEAPOT_BODY );
+		$this->denyAccessRaw(
+			self::TEAPOT_HEADER,
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text()
+		);
 	}
 
 	/**

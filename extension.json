@@ -1,9 +1,9 @@
 {
     "name": "CrawlerProtection",
     "author": "[https://mywikis.com MyWikis LLC]",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
-    "description": "Suite of protective measures to protect wikis from crawlers.",
+    "descriptionmsg": "crawlerprotection-desc",
     "type": "hook",
     "requires": {
         "MediaWiki": ">= 1.39.4"
@@ -20,7 +20,9 @@
         }
     },
     "Hooks": {
+        "ApiCheckCanExecute": "main",
         "MediaWikiPerformAction": "main",
+        "RestCheckCanExecute": "main",
         "SpecialPageBeforeExecute": "main"
     },
     "config": {
@@ -28,6 +30,10 @@
             "value": [
                 "history"
             ],
+            "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectedApiModules": {
+            "value": [],
             "merge_strategy": "provide_default"
         },
         "CrawlerProtectedSpecialPages": {
@@ -44,6 +50,10 @@
             ],
             "merge_strategy": "provide_default"
         },
+        "CrawlerProtectedRestPaths": {
+            "value": [],
+            "merge_strategy": "provide_default"
+        },
         "CrawlerProtectionRawDenial": {
             "value": false
         },
@@ -54,7 +64,7 @@
             "value": "HTTP/1.0 403 Forbidden"
         },
         "CrawlerProtectionRawDenialText": {
-            "value": "403 Forbidden. You must be logged in to view this page."
+            "value": ""
         },
         "CrawlerProtectionAllowedIPs": {
             "value": [],
