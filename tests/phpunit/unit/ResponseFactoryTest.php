@@ -387,10 +387,10 @@ class ResponseFactoryTest extends TestCase {
 		// Anonymous class without setPageTitleMsg() simulates MW < 1.41 OutputPage.
 		$output = new class ( $setPageTitleCallCount ) {
 			/** @var int */
-			private int $count;
+			private $count;
 
-			public function __construct( int &$count ) {
-				$this->count = &$count;
+			public function __construct( &$count ) {
+				$this->count =& $count;
 			}
 
 			public function setStatusCode( int $code ): void {
