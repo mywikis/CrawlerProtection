@@ -94,6 +94,10 @@ jobs:
       - name: PHP Code Sniffer
         run: cd extensions/${{ env.EXTNAME }} && ../../vendor/bin/phpcs -sp
       - name: Minus-x
+        # MediaWiki only ships mediawiki/minus-x in its development dependencies from 1.43 onwards,
+        # and composer-merge-plugin does not install the extension's own development dependencies.
+        # The check is version independent, so running it on the newer branches is enough.
+        if: matrix.mediawiki != 'REL1_39'
         run: cd extensions/${{ env.EXTNAME }} && ../../vendor/bin/minus-x check .
 
   security:
