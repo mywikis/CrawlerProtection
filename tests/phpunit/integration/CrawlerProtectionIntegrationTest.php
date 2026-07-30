@@ -82,14 +82,49 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 	 * Return a fresh OutputPage attached to a minimal RequestContext.
 	 *
 	 * A Title is required so that OutputPage::addWikiTextAsInterface() can
-	 * invoke the parser without an "Invalid title" error.
+	 * invoke the parser without an "Invalid title" error.  TitleFactory is
+	 * used instead of the Title class so that the test works both on releases
+	 * that still provide the unnamespaced Title alias and on those that do not.
 	 *
 	 * @return \MediaWiki\Output\OutputPage|\OutputPage
 	 */
 	private function makeOutputPage() {
 		$context = new \RequestContext();
-		$context->setTitle( \Title::makeTitle( NS_MAIN, 'Test' ) );
+		$context->setTitle(
+			$this->getServiceContainer()->getTitleFactory()->makeTitle( NS_MAIN, 'Test' )
+		);
 		return $context->getOutput();
+	}
+
+	/**
+	 * Build a FauxRequest carrying the given query parameters.
+	 *
+	 * FauxRequest lives in the MediaWiki\Request namespace on newer releases
+	 * and in the global namespace on older ones, so the class is resolved at
+	 * run time rather than referenced directly.
+	 *
+	 * @param array $params Query parameters
+	 * @return \MediaWiki\Request\FauxRequest|\FauxRequest
+	 */
+	private function makeRequest( array $params ) {
+		$class = class_exists( \MediaWiki\Request\FauxRequest::class )
+			? \MediaWiki\Request\FauxRequest::class
+			: 'FauxRequest';
+		return new $class( $params );
+	}
+
+	/**
+	 * Return a real anonymous user object for the given IP address.
+	 *
+	 * A real user is used rather than a mock because the User class has moved
+	 * between namespaces across supported releases, and mocking it by name
+	 * fails on releases where the chosen name is only an alias.
+	 *
+	 * @param string $ip
+	 * @return \MediaWiki\User\User|\User
+	 */
+	private function makeAnonUser( string $ip = '1.2.3.4' ) {
+		return $this->getServiceContainer()->getUserFactory()->newAnonymous( $ip );
 	}
 
 	/**
@@ -235,11 +270,9 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		$service = $this->makeWebModeService();
 
-		$user = $this->createMock( \MediaWiki\User\User::class );
-		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+		$user = $this->makeAnonUser();
 
-		$request = new \FauxRequest( [ 'action' => 'history' ] );
+		$request = $this->makeRequest( [ 'action' => 'history' ] );
 		$output  = $this->makeOutputPage();
 
 		$result = $service->checkPerformAction( $output, $user, $request );
@@ -265,7 +298,7 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		// getMutableTestUser() returns a real registered user object.
 		$user    = $this->getMutableTestUser()->getUser();
-		$request = new \FauxRequest( [ 'action' => 'history' ] );
+		$request = $this->makeRequest( [ 'action' => 'history' ] );
 		$output  = $this->makeOutputPage();
 
 		$result = $service->checkPerformAction( $output, $user, $request );
@@ -289,9 +322,7 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		$service = $this->makeWebModeService();
 
-		$user = $this->createMock( \MediaWiki\User\User::class );
-		$user->method( 'isRegistered' )->willReturn( false );
-		$user->method( 'getName' )->willReturn( '1.2.3.4' );
+		$user = $this->makeAnonUser();
 
 		$output = $this->makeOutputPage();
 
