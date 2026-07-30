@@ -363,33 +363,57 @@ class HooksTest extends TestCase {
 	}
 
 	/**
-	 * @covers ::onRestCheckCanExecute
+	 * Build a stub REST handler exposing an authority for the given user.
+	 *
+	 * @param \PHPUnit\Framework\MockObject\MockObject $user
+	 * @return \stdClass Stub REST handler
 	 */
-	public function testOnRestCheckCanExecuteDelegatesToService() {
-		$user = $this->createMock( self::$userClassName );
+	private function makeRestHandler( $user ) {
 		$authority = new class( $user ) {
+			/** @var \PHPUnit\Framework\MockObject\MockObject */
 			private $user;
 
+			/**
+			 * @param \PHPUnit\Framework\MockObject\MockObject $user
+			 */
 			public function __construct( $user ) {
 				$this->user = $user;
 			}
 
+			/**
+			 * @return \PHPUnit\Framework\MockObject\MockObject
+			 */
 			public function getUser() {
 				return $this->user;
 			}
 		};
 
-		$handler = new class( $authority ) {
+		return new class( $authority ) {
+			/** @var \stdClass */
 			private $authority;
 
+			/**
+			 * @param \stdClass $authority
+			 */
 			public function __construct( $authority ) {
 				$this->authority = $authority;
 			}
 
+			/**
+			 * @return \stdClass
+			 */
 			public function getAuthority() {
 				return $this->authority;
 			}
 		};
+	}
+
+	/**
+	 * @covers ::onRestCheckCanExecute
+	 */
+	public function testOnRestCheckCanExecuteDelegatesToService() {
+		$user = $this->createMock( self::$userClassName );
+		$handler = $this->makeRestHandler( $user );
 
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
@@ -410,29 +434,7 @@ class HooksTest extends TestCase {
 	 */
 	public function testOnRestCheckCanExecutePassesThroughWhenAllowed() {
 		$user = $this->createMock( self::$userClassName );
-		$authority = new class( $user ) {
-			private $user;
-
-			public function __construct( $user ) {
-				$this->user = $user;
-			}
-
-			public function getUser() {
-				return $this->user;
-			}
-		};
-
-		$handler = new class( $authority ) {
-			private $authority;
-
-			public function __construct( $authority ) {
-				$this->authority = $authority;
-			}
-
-			public function getAuthority() {
-				return $this->authority;
-			}
-		};
+		$handler = $this->makeRestHandler( $user );
 
 		$service = $this->createMock( CrawlerProtectionService::class );
 		$service->expects( $this->once() )
