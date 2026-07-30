@@ -86,6 +86,13 @@ namespace MediaWiki\Output {
 
 		public function setRobotPolicy( $policy ) {
 		}
+
+		/**
+		 * @return \MediaWiki\Request\WebRequest
+		 */
+		public function getRequest() {
+			return new \MediaWiki\Request\WebRequest();
+		}
 	}
 }
 
@@ -117,6 +124,23 @@ namespace MediaWiki\Request {
 	class WebRequest {
 		public function getVal( $name, $default = null ) {
 			return $default;
+		}
+
+		/**
+		 * @return WebResponse
+		 */
+		public function response() {
+			return new WebResponse();
+		}
+	}
+
+	class WebResponse {
+		/**
+		 * @param string $string
+		 * @param bool $replace
+		 * @param null|int $http_response_code
+		 */
+		public function header( $string, $replace = true, $http_response_code = null ) {
 		}
 	}
 }

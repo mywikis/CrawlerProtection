@@ -123,22 +123,9 @@ class ResponseFactory {
 	 * @suppress PhanPluginNeverReturnMethod
 	 */
 	protected function denyAccessRaw( string $header, string $message ): void {
-		$this->sendRobotsHeader();
+		header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		header( $header );
 		die( $message );
-	}
-
-	/**
-	 * Send an X-Robots-Tag header instructing crawlers not to index or
-	 * follow the denied URL, so that well-behaved crawlers stop
-	 * re-requesting it.
-	 *
-	 * @return void
-	 */
-	protected function sendRobotsHeader(): void {
-		if ( !headers_sent() ) {
-			header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
-		}
 	}
 
 	/**
@@ -148,9 +135,9 @@ class ResponseFactory {
 	 * @return void
 	 */
 	protected function denyAccessPretty( $output ): void {
-		$this->sendRobotsHeader();
 		$output->setStatusCode( 403 );
 		$output->setRobotPolicy( self::ROBOT_POLICY );
+		$output->getRequest()->response()->header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		$output->addWikiTextAsInterface(
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()
 		);

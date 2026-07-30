@@ -4,6 +4,7 @@ namespace MediaWiki\Extension\CrawlerProtection\Tests;
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,12 +14,41 @@ class ResponseFactoryTest extends TestCase {
 	/** @var string */
 	private static string $outputPageClassName;
 
+	/** @var string */
+	private static string $webRequestClassName;
+
+	/** @var string */
+	private static string $webResponseClassName;
+
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
 
 		self::$outputPageClassName = class_exists( '\MediaWiki\Output\OutputPage' )
 			? '\MediaWiki\Output\OutputPage'
 			: '\OutputPage';
+		self::$webRequestClassName = class_exists( '\MediaWiki\Request\WebRequest' )
+			? '\MediaWiki\Request\WebRequest'
+			: '\WebRequest';
+		self::$webResponseClassName = class_exists( '\MediaWiki\Request\WebResponse' )
+			? '\MediaWiki\Request\WebResponse'
+			: '\WebResponse';
+	}
+
+	/**
+	 * Build an OutputPage mock whose getRequest()->response() is a mock too.
+	 *
+	 * @param MockObject|null &$response Receives the WebResponse mock
+	 * @return MockObject OutputPage mock
+	 */
+	private function buildOutputMock( &$response = null ) {
+		$response = $this->createMock( self::$webResponseClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'response' )->willReturn( $response );
+
+		$output = $this->createMock( self::$outputPageClassName );
+		$output->method( 'getRequest' )->willReturn( $request );
+
+		return $output;
 	}
 
 	/**
@@ -53,7 +83,7 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
-		$output = $this->createMock( self::$outputPageClassName );
+		$output = $this->buildOutputMock();
 		$output->expects( $this->once() )
 			->method( 'setStatusCode' )
 			->with( 403 );
@@ -68,7 +98,7 @@ class ResponseFactoryTest extends TestCase {
 	}
 
 	/**
-	 * The denial must ask crawlers not to index or follow the URL.
+	 * The pretty denial must ask crawlers not to index or follow the URL.
 	 *
 	 * @covers ::denyAccessPretty
 	 */
@@ -79,21 +109,12 @@ class ResponseFactoryTest extends TestCase {
 			);
 		}
 
-		$factory = $this->getMockBuilder( ResponseFactory::class )
-			->setConstructorArgs( [
-				new ServiceOptions( ResponseFactory::CONSTRUCTOR_OPTIONS, [
-					'CrawlerProtectionUse418' => false,
-					'CrawlerProtectionRawDenial' => false,
-					'CrawlerProtectionRawDenialHeader' => '',
-					'CrawlerProtectionRawDenialText' => '',
-				] )
-			] )
-			->onlyMethods( [ 'sendRobotsHeader' ] )
-			->getMock();
+		$output = $this->buildOutputMock( $response );
+		$response->expects( $this->once() )
+			->method( 'header' )
+			->with( 'X-Robots-Tag: noindex,nofollow' );
 
-		$factory->expects( $this->once() )->method( 'sendRobotsHeader' );
-
-		$output = $this->createMock( self::$outputPageClassName );
+		$factory = $this->buildFactory();
 		$factory->denyAccess( $output );
 	}
 
