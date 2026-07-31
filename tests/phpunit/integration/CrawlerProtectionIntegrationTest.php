@@ -654,12 +654,14 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 	/**
 	 * The hook handler must deny an anonymous action=query request naming a
-	 * protected sub-module, and the denial must carry HTTP 403 rather than
-	 * core's default "200 OK with an error body".
+	 * protected sub-module, and must itself set HTTP 403 on the response
+	 * rather than leaving core's default "200 OK with an error body".
 	 *
-	 * This exercises the adapter itself - sub-module parsing, the $message
-	 * contract with core, and the status code - which the service-level tests
-	 * above cannot reach.
+	 * This exercises the adapter itself - sub-module parsing and the $message
+	 * contract with core - which the service-level tests above cannot reach.
+	 * The status and header assertions pin what the extension sets; whether
+	 * core preserves them while printing the error response is out of scope
+	 * here, since internal mode does not reach the printer.
 	 *
 	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
 	 */
@@ -699,13 +701,14 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		$this->assertSame(
 			403,
 			// @phan-suppress-next-line PhanUndeclaredMethod FauxResponse only
-			$response->getStatusCode()
+			$response->getStatusCode(),
+			'The extension must set HTTP 403 on a denied API request'
 		);
 		$this->assertSame(
 			'noindex,nofollow',
 			// @phan-suppress-next-line PhanUndeclaredMethod FauxResponse only
 			$response->getHeader( 'X-Robots-Tag' ),
-			'A denied API request must tell crawlers not to re-request the URL'
+			'The extension must tell crawlers not to re-request a denied URL'
 		);
 	}
 
