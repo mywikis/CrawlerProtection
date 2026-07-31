@@ -57,6 +57,88 @@ jobs:
       - name: Check qqq.json completeness
         run: .github/scripts/check-i18n-qqq.sh
 
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Setup Extension
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Run Semgrep for PHP
+        run: |
+          python -m venv .semgrep
+          .semgrep/bin/pip install semgrep==1.170.1
+          .semgrep/bin/semgrep scan --config p/php --include '*.php' --exclude vendor --exclude build \
+            --sarif --output semgrep.sarif .
+
+      - name: Upload Semgrep results to GitHub Security
+        # Pull requests from forks only get a read-only token, so the upload cannot succeed there.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep-php
+
+      - name: Run Semgrep for shell
+        run: |
+          .semgrep/bin/semgrep scan --config p/security-audit --include '*.sh' --exclude vendor --exclude build \
+            --sarif --output semgrep-shell.sarif .
+
+      - name: Upload shell Semgrep results to GitHub Security
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: semgrep-shell.sarif
+          category: semgrep-shell
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
+        env:
+          SHELLCHECK_OPTS: --shell=bash
+        with:
+          check_together: true
+          scandir: ./.github/scripts
+          severity: error
+          version: v0.10.0
+
+  trivy:
+    name: Trivy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Setup Extension
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          limit-severities-for-sarif: true
+          # Findings are reported through the Security tab instead of failing the build.
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
   style:
     name: Code Style
     runs-on: ${{ matrix.os }}

@@ -137,6 +137,19 @@ Your `.github/workflows/ci.yml` already exists and will run automatically on:
 
 Check results at: https://github.com/freephile/CrawlerProtection/actions
 
+### Security scanning jobs
+
+Two jobs run security scans and publish their results as SARIF to the repository's
+Security tab (Code scanning alerts); they do not fail the build on findings:
+
+- **SAST** - Semgrep (`p/php` on PHP files, `p/security-audit` on shell scripts) and
+  ShellCheck (severity `error`) over `.github/scripts`.
+- **Trivy** - filesystem scan for vulnerable dependencies, leaked secrets and
+  misconfigurations.
+
+SARIF uploads are skipped silently for pull requests from forks, which only receive a
+read-only token.
+
 ## 🔗 Resources
 
 - [docker-compose-ci documentation](https://github.com/gesinn-it-pub/docker-compose-ci)
