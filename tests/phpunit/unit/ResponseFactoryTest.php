@@ -345,6 +345,27 @@ class ResponseFactoryTest extends TestCase {
 	}
 
 	/**
+	 * The proxy-facing special-page alias header should be emitted verbatim when
+	 * aliases are supplied.
+	 *
+	 * @covers ::markSpecialPageAliases
+	 */
+	public function testMarkSpecialPageAliasesSendsHeader() {
+		$response = $this->createMock( self::$webResponseClassName );
+		$response->expects( $this->once() )
+			->method( 'header' )
+			->with(
+				'X-CrawlerProtection-Special-Page-Aliases: ' .
+				'Special:WhatLinksHere, Spezial:Linkliste'
+			);
+
+		$this->buildFactory()->markSpecialPageAliases(
+			$response,
+			[ 'Special:WhatLinksHere', 'Spezial:Linkliste' ]
+		);
+	}
+
+	/**
 	 * @covers ::__construct
 	 */
 	public function testConstructorAcceptsValidOptions() {
