@@ -36,6 +36,7 @@ Do **not** introduce PHP 8-only syntax in extension code:
 - Non-hidden-path content changes must include a version bump in `extension.json`.
 - Changes in `i18n/` must include at least a patch bump.
 - CI validates: parallel-lint, PHPCS, Phan (`--minimum-target-php-version=7.4`), PHPUnit.
+- CI also runs security scans (Semgrep, ShellCheck, Trivy) that report to the Security tab without failing the build.
 
 See `.github/scripts/check-version-bump.sh` and `.github/workflows/ci.yml`.
 
