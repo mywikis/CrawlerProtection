@@ -20,37 +20,44 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * @file ServiceWiring.php
+ * @file HookRunner.php
  */
 
-use MediaWiki\Config\ServiceOptions;
-use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
-use MediaWiki\Extension\CrawlerProtection\HookRunner;
-use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
-use MediaWiki\Logger\LoggerFactory;
-use MediaWiki\MediaWikiServices;
+namespace MediaWiki\Extension\CrawlerProtection;
 
-return [
-	'CrawlerProtection.ResponseFactory' =>
-		static function ( MediaWikiServices $services ): ResponseFactory {
-			return new ResponseFactory(
-				new ServiceOptions(
-					ResponseFactory::CONSTRUCTOR_OPTIONS,
-					$services->getMainConfig()
-				)
-			);
-		},
-	'CrawlerProtection.CrawlerProtectionService' =>
-		static function ( MediaWikiServices $services ): CrawlerProtectionService {
-			return new CrawlerProtectionService(
-				new ServiceOptions(
-					CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
-					$services->getMainConfig()
-				),
-				$services->get( 'CrawlerProtection.ResponseFactory' ),
-				new HookRunner( $services->getHookContainer() ),
-				defined( 'MW_ENTRY_POINT' ) && MW_ENTRY_POINT === 'cli',
-				LoggerFactory::getInstance( 'CrawlerProtection' )
-			);
-		},
-];
+use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
+use MediaWiki\HookContainer\HookContainer;
+
+/**
+ * Runs the hooks defined by this extension.
+ *
+ * @internal
+ */
+class HookRunner implements CrawlerProtectionShouldDenyHook {
+
+	/** @var HookContainer */
+	private HookContainer $hookContainer;
+
+	/**
+	 * @param HookContainer $hookContainer
+	 */
+	public function __construct( HookContainer $hookContainer ) {
+		$this->hookContainer = $hookContainer;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function onCrawlerProtectionShouldDeny(
+		$user,
+		$request,
+		string $entryPoint,
+		?string $specialPageName,
+		bool &$shouldDeny
+	) {
+		return $this->hookContainer->run(
+			'CrawlerProtectionShouldDeny',
+			[ $user, $request, $entryPoint, $specialPageName, &$shouldDeny ]
+		);
+	}
+}

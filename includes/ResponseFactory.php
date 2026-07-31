@@ -39,7 +39,9 @@ use MediaWiki\Output\OutputPage;
 class ResponseFactory {
 
 	private const TEAPOT_HEADER = 'HTTP/1.0 418 I\'m a teapot';
-	private const TEAPOT_BODY = 'I\'m a teapot';
+
+	/** Robot directive sent on every denial response */
+	private const ROBOT_POLICY = 'noindex,nofollow';
 
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
@@ -73,15 +75,23 @@ class ResponseFactory {
 	 *
 	 * @param OutputPage $output Used only for the "pretty" strategy
 	 * @return void
+	 * @suppress SecurityCheck-XSS The raw body comes from wiki configuration
+	 *  or from an interface message, both of which are trusted sources.
 	 */
 	public function denyAccess( $output ): void {
 		if ( $this->options->get( 'CrawlerProtectionRawDenial' ) ) {
 			if ( $this->options->get( 'CrawlerProtectionUse418' ) ) {
 				$this->denyAccessWith418();
 			} else {
+				$rawText = $this->options->get( 'CrawlerProtectionRawDenialText' );
+				if ( $rawText === '' ) {
+					$rawText = wfMessage( 'crawlerprotection-rawdenial-text' )
+						->inContentLanguage()
+						->text();
+				}
 				$this->denyAccessRaw(
 					$this->options->get( 'CrawlerProtectionRawDenialHeader' ),
-					$this->options->get( 'CrawlerProtectionRawDenialText' )
+					$rawText
 				);
 			}
 		} else {
@@ -94,13 +104,22 @@ class ResponseFactory {
 	 *
 	 * @return void
 	 * @suppress PhanPluginNeverReturnMethod
+	 * @suppress SecurityCheck-XSS The body comes from an interface message,
+	 *  which is a trusted source.
 	 */
 	protected function denyAccessWith418(): void {
-		$this->denyAccessRaw( self::TEAPOT_HEADER, self::TEAPOT_BODY );
+		$this->denyAccessRaw(
+			self::TEAPOT_HEADER,
+			wfMessage( 'crawlerprotection-rawdenial-teapot' )->inContentLanguage()->text()
+		);
 	}
 
 	/**
 	 * Output a raw HTTP response and halt.
+	 *
+	 * The robot directive is sent here as well as on the pretty denial page,
+	 * so that all three denial strategies tell well-behaved crawlers not to
+	 * re-request the URL.
 	 *
 	 * @param string $header
 	 * @param string $message
@@ -109,7 +128,35 @@ class ResponseFactory {
 	 */
 	protected function denyAccessRaw( string $header, string $message ): void {
 		header( $header );
+		header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		die( $message );
+	}
+
+	/**
+	 * Mark a denial that is not rendered through OutputPage.
+	 *
+	 * Used for the Action API and REST entry points, which produce their own
+	 * error body. Core's ApiCheckCanExecute denial path calls
+	 * ApiBase::dieWithError() without an HTTP code, which would otherwise
+	 * return "200 OK" with an error body and nothing telling the crawler to
+	 * stop, so the status code is set here.
+	 *
+	 * @param mixed $response WebResponse to write headers to, or null when the
+	 *  entry point cannot supply one.  WebResponse moved between namespaces
+	 *  across supported releases, hence the loose type.
+	 * @param int|null $statusCode HTTP status to set, or null to leave it alone
+	 * @return void
+	 */
+	public function markDenied( $response, ?int $statusCode = null ): void {
+		if ( $response === null ) {
+			return;
+		}
+
+		if ( $statusCode !== null ) {
+			$response->statusHeader( $statusCode );
+		}
+
+		$response->header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 	}
 
 	/**
@@ -120,15 +167,21 @@ class ResponseFactory {
 	 */
 	protected function denyAccessPretty( $output ): void {
 		$output->setStatusCode( 403 );
+		$output->setRobotPolicy( self::ROBOT_POLICY );
+		$output->getRequest()->response()->header( 'X-Robots-Tag: ' . self::ROBOT_POLICY );
 		$output->addWikiTextAsInterface(
 			wfMessage( 'crawlerprotection-accessdenied-text' )->plain()
 		);
 
-		if ( version_compare( MW_VERSION, '1.41', '<' ) ) {
-			$output->setPageTitle( wfMessage( 'crawlerprotection-accessdenied-title' ) );
-		} else {
+		$msg = wfMessage( 'crawlerprotection-accessdenied-title' );
+		// setPageTitleMsg() was added in MediaWiki 1.41; fall back to
+		// setPageTitle() for earlier versions.  Using method_exists() keeps
+		// both branches reachable in tests regardless of MW_VERSION.
+		if ( method_exists( $output, 'setPageTitleMsg' ) ) {
 			// @phan-suppress-next-line PhanUndeclaredMethod Exists in 1.41+
-			$output->setPageTitleMsg( wfMessage( 'crawlerprotection-accessdenied-title' ) );
+			$output->setPageTitleMsg( $msg );
+		} else {
+			$output->setPageTitle( $msg );
 		}
 	}
 }

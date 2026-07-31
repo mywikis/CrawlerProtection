@@ -16,6 +16,58 @@ namespace MediaWiki\SpecialPage\Hook {
 	}
 }
 
+// API/REST stubs
+namespace MediaWiki\Rest {
+	class HttpException extends \RuntimeException {
+		/**
+		 * @param string $message
+		 * @param int $code HTTP status code
+		 */
+		public function __construct( string $message = '', int $code = 500 ) {
+			parent::__construct( $message, $code );
+		}
+	}
+
+	class LocalizedHttpException extends HttpException {
+		/**
+		 * @param \Wikimedia\Message\MessageValue $messageValue
+		 * @param int $code HTTP status code
+		 */
+		public function __construct( $messageValue, int $code = 500 ) {
+			parent::__construct( $messageValue->getKey(), $code );
+		}
+	}
+}
+
+namespace Wikimedia\Message {
+	class MessageValue {
+		/** @var string */
+		private string $key;
+
+		/**
+		 * @param string $key
+		 */
+		public function __construct( string $key ) {
+			$this->key = $key;
+		}
+
+		/**
+		 * @param string $key
+		 * @return self
+		 */
+		public static function new( string $key ): self {
+			return new self( $key );
+		}
+
+		/**
+		 * @return string
+		 */
+		public function getKey(): string {
+			return $this->key;
+		}
+	}
+}
+
 // ServiceOptions stub
 namespace MediaWiki\Config {
 	class ServiceOptions {
@@ -83,6 +135,16 @@ namespace MediaWiki\Output {
 
 		public function setPageTitleMsg( $msg ) {
 		}
+
+		public function setRobotPolicy( $policy ) {
+		}
+
+		/**
+		 * @return \MediaWiki\Request\WebRequest
+		 */
+		public function getRequest() {
+			return new \MediaWiki\Request\WebRequest();
+		}
 	}
 }
 
@@ -114,6 +176,60 @@ namespace MediaWiki\Request {
 	class WebRequest {
 		public function getVal( $name, $default = null ) {
 			return $default;
+		}
+
+		public function getIP(): string {
+			return '127.0.0.1';
+		}
+
+		/**
+		 * @param string $name
+		 * @param int $flags
+		 * @return string|false
+		 */
+		public function getHeader( $name, $flags = 0 ) {
+			return false;
+		}
+
+		/**
+		 * @return WebResponse
+		 */
+		public function response() {
+			return new WebResponse();
+		}
+	}
+
+	class WebResponse {
+		/**
+		 * @param string $string
+		 * @param bool $replace
+		 * @param null|int $http_response_code
+		 */
+		public function header( $string, $replace = true, $http_response_code = null ) {
+		}
+
+		/**
+		 * @param int $code
+		 */
+		public function statusHeader( $code ) {
+		}
+	}
+}
+
+namespace MediaWiki\Context {
+	class RequestContext {
+		/**
+		 * @return self
+		 */
+		public static function getMain(): self {
+			return new self();
+		}
+
+		/**
+		 * @return \MediaWiki\Request\WebRequest
+		 */
+		public function getRequest() {
+			return new \MediaWiki\Request\WebRequest();
 		}
 	}
 }

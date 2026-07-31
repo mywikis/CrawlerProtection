@@ -26,9 +26,11 @@
 namespace MediaWiki\Extension\CrawlerProtection;
 
 use MediaWiki\Config\ServiceOptions;
+use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
 use MediaWiki\User\User;
+use Psr\Log\LoggerInterface;
 use Wikimedia\IPUtils;
 
 /**
@@ -46,10 +48,14 @@ class CrawlerProtectionService {
 	/** @var string[] List of constructor options this class accepts */
 	public const CONSTRUCTOR_OPTIONS = [
 		'CrawlerProtectedActions',
+		'CrawlerProtectedApiModules',
 		'CrawlerProtectedQueryParams',
+		'CrawlerProtectedRestPaths',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
 		'CrawlerProtectionProtectRevisions',
+		'CrawlerProtectionTreatTempUsersAsAnon',
+		'CrawlerProtectionTrustXForwardedFor',
 	];
 
 	/** @var ServiceOptions */
@@ -58,23 +64,65 @@ class CrawlerProtectionService {
 	/** @var ResponseFactory */
 	private ResponseFactory $responseFactory;
 
+	/** @var CrawlerProtectionShouldDenyHook */
+	private CrawlerProtectionShouldDenyHook $hookRunner;
+
 	/** @var bool */
 	private bool $cliMode;
+
+	/** @var LoggerInterface */
+	private LoggerInterface $logger;
+
+	/** @var string[] Normalised CrawlerProtectedActions */
+	private array $normalizedProtectedActions;
+
+	/** @var string[] Normalised CrawlerProtectedApiModules */
+	private array $normalizedProtectedApiModules;
+
+	/** @var string[] Normalised CrawlerProtectedRestPaths */
+	private array $normalizedProtectedRestPaths;
+
+	/** @var string[] Normalised CrawlerProtectedQueryParams */
+	private array $normalizedProtectedQueryParams;
+
+	/** @var string[] Normalised CrawlerProtectedSpecialPages */
+	private array $normalizedProtectedSpecialPages;
+
+	/** @var string[] Normalised and validated CrawlerProtectionAllowedIPs */
+	private array $normalizedAllowedIPs;
 
 	/**
 	 * @param ServiceOptions $options
 	 * @param ResponseFactory $responseFactory
+	 * @param CrawlerProtectionShouldDenyHook $hookRunner
 	 * @param bool $cliMode
+	 * @param LoggerInterface $logger
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
-		bool $cliMode
+		CrawlerProtectionShouldDenyHook $hookRunner,
+		bool $cliMode,
+		LoggerInterface $logger
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
 		$this->responseFactory = $responseFactory;
+		$this->hookRunner = $hookRunner;
 		$this->cliMode = $cliMode;
+		$this->logger = $logger;
+
+		// Pre-normalise all array-valued configs at construction time so that a
+		// misconfigured scalar never fatals on array_map / foreach, and so that
+		// any warning is logged exactly once per request rather than per call.
+		$this->normalizedProtectedActions = $this->normalizeArrayConfig( 'CrawlerProtectedActions' );
+		$this->normalizedProtectedApiModules = $this->normalizeArrayConfig( 'CrawlerProtectedApiModules' );
+		$this->normalizedProtectedRestPaths = $this->normalizeArrayConfig( 'CrawlerProtectedRestPaths' );
+		$this->normalizedProtectedQueryParams = $this->normalizeArrayConfig( 'CrawlerProtectedQueryParams' );
+		$this->normalizedProtectedSpecialPages = $this->normalizeArrayConfig( 'CrawlerProtectedSpecialPages' );
+		$this->normalizedAllowedIPs = $this->normalizeAndValidateIPs(
+			$this->normalizeArrayConfig( 'CrawlerProtectionAllowedIPs' )
+		);
 	}
 
 	/**
@@ -97,31 +145,39 @@ class CrawlerProtectionService {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
-			return true;
+		$shouldDeny = false;
+
+		if ( !$this->isUserAllowed( $user ) && !$this->isRequestIPAllowed( $request ) ) {
+			$type = $request->getVal( 'type' );
+			$action = $request->getVal( 'action' );
+			$diffId = (int)$request->getVal( 'diff' );
+			$oldId = (int)$request->getVal( 'oldid' );
+
+			// $wgCrawlerProtectionProtectRevisions independently controls whether
+			// type=revision, diff and oldid requests are blocked. This allows
+			// operators to disable history-listing protection (by removing 'history'
+			// from $wgCrawlerProtectedActions) while still blocking direct access
+			// to individual revisions and diffs, or vice versa.
+			$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
+
+			$shouldDeny = $this->isProtectedAction( $action )
+				|| $this->hasProtectedQueryParam( $request )
+				|| ( $revisionsProtected && (
+					$type === 'revision'
+					|| $diffId > 0
+					|| $oldId > 0
+				) );
 		}
 
-		$type = $request->getVal( 'type' );
-		$action = $request->getVal( 'action' );
-		$diffId = (int)$request->getVal( 'diff' );
-		$oldId = (int)$request->getVal( 'oldid' );
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_INDEX,
+			null,
+			$shouldDeny
+		);
 
-		// $wgCrawlerProtectionProtectRevisions independently controls whether
-		// type=revision, diff and oldid requests are blocked. This allows
-		// operators to disable history-listing protection (by removing 'history'
-		// from $wgCrawlerProtectedActions) while still blocking direct access
-		// to individual revisions and diffs, or vice versa.
-		$revisionsProtected = $this->options->get( 'CrawlerProtectionProtectRevisions' );
-
-		if (
-			$this->isProtectedAction( $action )
-			|| $this->hasProtectedQueryParam( $request )
-			|| ( $revisionsProtected && (
-				$type === 'revision'
-				|| $diffId > 0
-				|| $oldId > 0
-			) )
-		) {
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
@@ -152,7 +208,7 @@ class CrawlerProtectionService {
 			return false;
 		}
 
-		foreach ( $this->options->get( 'CrawlerProtectedQueryParams' ) as $param ) {
+		foreach ( $this->normalizedProtectedQueryParams as $param ) {
 			if ( $request->getVal( $param ) !== null ) {
 				return true;
 			}
@@ -178,7 +234,7 @@ class CrawlerProtectionService {
 
 		$protectedActions = array_map(
 			'strtolower',
-			$this->options->get( 'CrawlerProtectedActions' )
+			$this->normalizedProtectedActions
 		);
 
 		return in_array( strtolower( $action ), $protectedActions, true );
@@ -193,27 +249,207 @@ class CrawlerProtectionService {
 	 * @param string $specialPageName The canonical special page name
 	 * @param OutputPage $output
 	 * @param User $user
+	 * @param WebRequest $request
 	 * @return bool
 	 */
 	public function checkSpecialPage(
 		string $specialPageName,
 		$output,
-		$user
+		$user,
+		$request
 	): bool {
 		if ( $this->cliMode ) {
 			return true;
 		}
 
-		if ( $user->isRegistered() || $this->isIPAllowed( $user->getName() ) ) {
-			return true;
-		}
+		$shouldDeny = !$this->isUserAllowed( $user )
+			&& !$this->isRequestIPAllowed( $request )
+			&& $this->isProtectedSpecialPage( $specialPageName );
 
-		if ( $this->isProtectedSpecialPage( $specialPageName ) ) {
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_INDEX,
+			$specialPageName,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Check whether an Action API module call should be blocked.
+	 *
+	 * Returns false (= deny) when the module is in the configured
+	 * protected-modules list and the caller is anonymous.  Returns
+	 * true otherwise.
+	 *
+	 * @param string $moduleName The canonical module name (e.g. "revisions", "compare")
+	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
+	 * @return bool
+	 */
+	public function checkApiModule( string $moduleName, $user, $request = null ): bool {
+		return $this->checkApiModules( [ $moduleName ], $user, $request );
+	}
+
+	/**
+	 * Check whether an Action API request involving the given modules
+	 * should be blocked.
+	 *
+	 * Returns false (= deny) when any of the modules is in the configured
+	 * protected-modules list and the caller is anonymous.  Returns true
+	 * otherwise.
+	 *
+	 * @param string[] $moduleNames Module names involved in the request, i.e.
+	 *  the requested action plus, for action=query, its sub-modules
+	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
+	 * @return bool
+	 */
+	public function checkApiModules( array $moduleNames, $user, $request = null ): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
+		$shouldDeny = false;
+
+		if ( !$this->isUserAllowed( $user ) && !$this->isRequestIPAllowed( $request ) ) {
+			foreach ( $moduleNames as $moduleName ) {
+				if ( $this->isProtectedApiModule( $moduleName ) ) {
+					$shouldDeny = true;
+					break;
+				}
+			}
+		}
+
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_API,
+			null,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
+			// Core denies an ApiCheckCanExecute veto with dieWithError() and no
+			// HTTP code, which would answer "200 OK" with an error body, so the
+			// status and the robot directive are set here.
+			$this->responseFactory->markDenied(
+				$request !== null ? $request->response() : null,
+				403
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Determine whether the given API module name is in the
+	 * configured list of protected modules.
+	 *
+	 * The comparison is case-insensitive.
+	 *
+	 * @param string $moduleName
+	 * @return bool
+	 */
+	public function isProtectedApiModule( string $moduleName ): bool {
+		$protected = array_map(
+			'strtolower',
+			$this->normalizedProtectedApiModules
+		);
+		return in_array( strtolower( $moduleName ), $protected, true );
+	}
+
+	/**
+	 * Check whether a REST API request should be blocked.
+	 *
+	 * Returns false (= deny) when the path matches a configured
+	 * protected pattern and the caller is anonymous.  Returns true
+	 * otherwise.
+	 *
+	 * @param string $path The request path (e.g. "/page/Main_Page/history")
+	 * @param User $user
+	 * @param WebRequest|null $request Request the check applies to, used to
+	 *  resolve the canonical client IP for the allowlist
+	 * @return bool
+	 */
+	public function checkRestPath( string $path, $user, $request = null ): bool {
+		if ( $this->cliMode ) {
+			return true;
+		}
+
+		$shouldDeny = !$this->isUserAllowed( $user )
+			&& !$this->isRequestIPAllowed( $request )
+			&& $this->isProtectedRestPath( $path );
+
+		$this->hookRunner->onCrawlerProtectionShouldDeny(
+			$user,
+			$request,
+			CrawlerProtectionShouldDenyHook::ENTRY_POINT_REST,
+			null,
+			$shouldDeny
+		);
+
+		if ( $shouldDeny ) {
+			// The 403 status comes from the LocalizedHttpException raised by the
+			// hook handler; only the robot directive is added here.
+			$this->responseFactory->markDenied(
+				$request !== null ? $request->response() : null
+			);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Determine whether the given REST path matches any configured
+	 * protected-path pattern.
+	 *
+	 * Each pattern is tested as a glob (fnmatch) with the FNM_PATHNAME
+	 * flag, so a "*" wildcard matches a single path component and never
+	 * spans a "/" separator. See $wgCrawlerProtectedRestPaths in the
+	 * README for example patterns.
+	 *
+	 * The path passed by the RestCheckCanExecute hook is module-relative:
+	 * core's Router strips the rest.php root and the module prefix, so
+	 * "/w/rest.php/v1/page/Main_Page/history" arrives as
+	 * "/page/Main_Page/history" and patterns must omit the prefix.
+	 *
+	 * @param string $path
+	 * @return bool
+	 */
+	public function isProtectedRestPath( string $path ): bool {
+		$patterns = $this->normalizedProtectedRestPaths;
+		if ( $patterns === [] ) {
+			return false;
+		}
+
+		// fnmatch() is unavailable on a handful of exotic PHP builds; without it
+		// no pattern can be evaluated, so nothing is treated as protected.
+		if ( !function_exists( 'fnmatch' ) ) {
+			$this->logger->warning(
+				'CrawlerProtection: fnmatch() is unavailable, so ' .
+					'CrawlerProtectedRestPaths cannot be evaluated.'
+			);
+			return false;
+		}
+
+		foreach ( $patterns as $pattern ) {
+			if ( fnmatch( $pattern, $path, FNM_PATHNAME ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -231,8 +467,6 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	public function isProtectedSpecialPage( string $specialPageName ): bool {
-		$protectedSpecialPages = $this->options->get( 'CrawlerProtectedSpecialPages' );
-
 		// Normalize protected special pages: lowercase and strip any
 		// namespace prefix (everything up to and including the first ':').
 		$normalizedProtectedPages = array_map(
@@ -244,12 +478,87 @@ class CrawlerProtectionService {
 				}
 				return $lower;
 			},
-			$protectedSpecialPages
+			$this->normalizedProtectedSpecialPages
 		);
 
 		$name = strtolower( $specialPageName );
 
 		return in_array( $name, $normalizedProtectedPages, true );
+	}
+
+	/**
+	 * Checks whether the request originates from an allowed IP range.
+	 *
+	 * The canonical client IP is taken from WebRequest (which correctly applies
+	 * trusted-proxy / X-Forwarded-For handling) rather than the username.
+	 *
+	 * When CrawlerProtectionTrustXForwardedFor is enabled, the address reported
+	 * by the reverse proxy in X-Forwarded-For is consulted as well, for wikis
+	 * whose proxy is not registered in $wgCdnServersNoPurge.
+	 *
+	 * A null request (for example when an entry point cannot supply one) is
+	 * never allowed through, so the regular protection logic applies.
+	 *
+	 * @param WebRequest|null $request
+	 * @return bool
+	 */
+	private function isRequestIPAllowed( $request ): bool {
+		if ( $request === null || $this->normalizedAllowedIPs === [] ) {
+			return false;
+		}
+
+		if ( $this->isIPAllowed( $request->getIP() ) ) {
+			return true;
+		}
+
+		$forwardedIP = $this->getForwardedIP( $request );
+
+		return $forwardedIP !== null && $this->isIPAllowed( $forwardedIP );
+	}
+
+	/**
+	 * Resolve the client address reported by the immediate reverse proxy in the
+	 * X-Forwarded-For header, or null when it is unavailable or not trusted.
+	 *
+	 * MediaWiki only follows X-Forwarded-For for proxies that are registered as
+	 * trusted (see $wgCdnServers / $wgCdnServersNoPurge), so behind an
+	 * unregistered proxy such as HAProxy WebRequest::getIP() returns the proxy's
+	 * own address. Registering the proxy remains the correct fix; this opt-in
+	 * fallback covers wikis that cannot do so.
+	 *
+	 * Only the *last* entry of the header is used. A reverse proxy appends the
+	 * address it observed to the end of the chain, so earlier entries may have
+	 * been supplied by the client and must never be trusted. This still assumes
+	 * that every request reaches the wiki through exactly one such proxy, which
+	 * is why the behaviour is disabled by default.
+	 *
+	 * @param WebRequest $request
+	 * @return string|null Sanitized IP address, or null if none can be trusted
+	 */
+	private function getForwardedIP( $request ): ?string {
+		if ( !$this->options->get( 'CrawlerProtectionTrustXForwardedFor' ) ) {
+			return null;
+		}
+
+		$forwardedFor = $request->getHeader( 'X-Forwarded-For' );
+		if ( !is_string( $forwardedFor ) || trim( $forwardedFor ) === '' ) {
+			return null;
+		}
+
+		$chain = explode( ',', $forwardedFor );
+		$candidate = trim( (string)end( $chain ) );
+		if ( $candidate === '' ) {
+			return null;
+		}
+
+		// canonicalize() rejects anything that is not a single IP address,
+		// returning null (older releases returned false).
+		$canonical = IPUtils::canonicalize( $candidate );
+		if ( !is_string( $canonical ) || $canonical === '' ) {
+			return null;
+		}
+
+		return IPUtils::sanitizeIP( $canonical );
 	}
 
 	/**
@@ -259,12 +568,96 @@ class CrawlerProtectionService {
 	 * @return bool
 	 */
 	private function isIPAllowed( string $ip ): bool {
-		$allowedIPs = $this->options->get( 'CrawlerProtectionAllowedIPs' );
+		return IPUtils::isInRanges( $ip, $this->normalizedAllowedIPs );
+	}
 
-		if ( !is_array( $allowedIPs ) ) {
-			$allowedIPs = [ $allowedIPs ];
+	/**
+	 * Determine whether the given user should be allowed through the protection
+	 * without an IP check.
+	 *
+	 * Registered users are allowed unless CrawlerProtectionTreatTempUsersAsAnon
+	 * is true and the user holds a temporary account.  Temporary accounts were
+	 * introduced in MediaWiki 1.42 (User::isTemp()); on earlier versions the
+	 * method does not exist and the guard below is a no-op.
+	 *
+	 * @param User $user
+	 * @return bool
+	 */
+	private function isUserAllowed( $user ): bool {
+		if ( !$user->isRegistered() ) {
+			return false;
 		}
 
-		return IPUtils::isInRanges( $ip, $allowedIPs );
+		// When CrawlerProtectionTreatTempUsersAsAnon is true, a temporary-account
+		// user is treated as anonymous so the rest of the protection logic applies.
+		if ( $this->options->get( 'CrawlerProtectionTreatTempUsersAsAnon' )
+			&& method_exists( $user, 'isTemp' )
+			&& $user->isTemp()
+		) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Coerce a config value to a string array, logging a warning if the raw
+	 * value is not already an array or contains non-string elements.
+	 *
+	 * @param string $configKey
+	 * @return string[]
+	 */
+	private function normalizeArrayConfig( string $configKey ): array {
+		$value = $this->options->get( $configKey );
+
+		$wasScalar = !is_array( $value );
+
+		if ( $wasScalar ) {
+			$this->logger->warning(
+				'CrawlerProtection: Config {configKey} should be an array; got a scalar. ' .
+					'Treating it as a single-element array.',
+				[ 'configKey' => $configKey ]
+			);
+			$value = [ $value ];
+		}
+
+		$filtered = array_values( array_filter( $value, 'is_string' ) );
+
+		// A non-string scalar has already been reported above; warning again
+		// about the same value would be noise.
+		if ( !$wasScalar && count( $filtered ) !== count( $value ) ) {
+			$this->logger->warning(
+				'CrawlerProtection: Config {configKey} contains non-string entries; ' .
+					'they have been ignored.',
+				[ 'configKey' => $configKey ]
+			);
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Validate IP allowlist entries and log a warning for any entry that does
+	 * not look like a valid IP address, CIDR range, or explicit range.
+	 *
+	 * Invalid entries are kept in the returned array because
+	 * IPUtils::isInRanges() handles them gracefully (returns false), so they
+	 * do not cause errors; the warning simply makes typos discoverable.
+	 *
+	 * @param string[] $ips
+	 * @return string[]
+	 */
+	private function normalizeAndValidateIPs( array $ips ): array {
+		foreach ( $ips as $ip ) {
+			// Accept single IPs, CIDR ranges, and explicit "a - b" ranges.
+			if ( !IPUtils::isIPAddress( $ip ) && !IPUtils::isValidRange( $ip ) ) {
+				$this->logger->warning(
+					'CrawlerProtection: CrawlerProtectionAllowedIPs entry "{ip}" does not look like ' .
+						'a valid IP address, CIDR range, or explicit IP range.',
+					[ 'ip' => $ip ]
+				);
+			}
+		}
+		return $ips;
 	}
 }

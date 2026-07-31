@@ -55,7 +55,8 @@ Inside the container (`make bash`):
 composer test        # Run phpcs + phpunit
 composer phpcs       # Check code style
 composer phpcbf      # Fix code style
-composer phpunit     # Run unit tests
+composer phpunit     # Run unit tests (tests/phpunit/unit/)
+composer phpunit:integration  # Run integration tests (tests/phpunit/integration/)
 ```
 
 ## Update Docker CI
