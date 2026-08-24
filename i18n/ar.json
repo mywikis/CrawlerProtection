@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"Meno25"
+		]
+	},
+	"crawlerprotection-desc": "مجموعة من التدابير الوقائية لحماية مواقع الويكي من برامج الزحف.",
+	"crawlerprotection-accessdenied-title": "تم الرفض",
+	"crawlerprotection-accessdenied-text": "يجب عليك تسجيل الدخول لتنفيذ هذا الإجراء أو لعرض هذه الصفحة الخاصة.",
+	"crawlerprotection-rawdenial-text": "403 ممنوع. يجب عليك تسجيل الدخول لعرض هذه الصفحة."
+}

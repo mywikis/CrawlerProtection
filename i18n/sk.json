@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"Wizzard"
+		]
+	},
+	"crawlerprotection-desc": "Súbor ochranných opatrení na ochranu wiki pred prehľadávacími robotmi.",
+	"crawlerprotection-accessdenied-title": "Prístup zamietnutý",
+	"crawlerprotection-accessdenied-text": "Na vykonanie tejto akcie alebo zobrazenie tejto špeciálnej stránky musíte byť prihlásení.",
+	"crawlerprotection-rawdenial-text": "403 Zakázané. Na zobrazenie tejto stránky musíte byť prihlásení."
+}

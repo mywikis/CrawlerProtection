@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"GuoPC"
+		]
+	},
+	"crawlerprotection-desc": "一套保护wiki免受爬虫侵扰的保护措施。",
+	"crawlerprotection-accessdenied-title": "拒绝访问",
+	"crawlerprotection-accessdenied-text": "您必须登录才能执行此操作或查看此特殊页面。",
+	"crawlerprotection-rawdenial-text": "403禁止访问。您必须登录才能查看此页面。"
+}

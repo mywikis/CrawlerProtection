@@ -1,0 +1,12 @@
+{
+	"@metadata": {
+		"authors": [
+			"Toliño"
+		]
+	},
+	"crawlerprotection-desc": "Conxunto de medidas de protección para protexer os wikis dos rastrexadores.",
+	"crawlerprotection-accessdenied-title": "Acceso rexeitado",
+	"crawlerprotection-accessdenied-text": "Cómpre iniciar sesión para realizar esta acción ou ver esta páxina especial.",
+	"crawlerprotection-rawdenial-text": "Prohibido 403. Cómpre iniciar sesión para ver esta páxina.",
+	"crawlerprotection-rawdenial-teapot": "Son unha teteira"
+}

@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"Bjankuloski06"
+		]
+	},
+	"crawlerprotection-desc": "Комплет заштитни мерки за заштита на викија од ползачи.",
+	"crawlerprotection-accessdenied-title": "Пристапот е одбиен",
+	"crawlerprotection-accessdenied-text": "Мора да сте најавени за да го извршите ова дејство или да ја гледате оваа службена страница.",
+	"crawlerprotection-rawdenial-text": "403 Забрането. Мора да сте најавени за да ја гледате оваа страница."
+}

@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"Hedda"
+		]
+	},
+	"crawlerprotection-desc": "Vikileri tarama botlarına karşı korumaya yönelik önlemler bütünü.",
+	"crawlerprotection-accessdenied-title": "Erişim reddedildi",
+	"crawlerprotection-accessdenied-text": "Bu işlemi gerçekleştirmek veya bu özel sayfayı görüntülemek için oturum açmış olmanız gerekir.",
+	"crawlerprotection-rawdenial-text": "403 Erişim Yasak. Bu sayfayı görüntülemek için oturum açmış olmanız gerekir."
+}

@@ -1,10 +1,10 @@
 {
-    "@metadata": {
-        "authors": []
-    },
-    "crawlerprotection-desc": "Description of the [[mw:Extension:CrawlerProtection|CrawlerProtection]] extension, shown on [[Special:Version]]. {{desc}}",
-    "crawlerprotection-accessdenied-title": "Title of the access-denied page shown to anonymous users who attempt to access a protected action or special page. Displayed as the page heading.",
-    "crawlerprotection-accessdenied-text": "Body text of the access-denied page shown to anonymous users who attempt to access a protected action or special page. May contain wikitext.",
-    "crawlerprotection-rawdenial-text": "Body of the raw HTTP 403 response sent when <code>$wgCrawlerProtectionRawDenial</code> is enabled and <code>$wgCrawlerProtectionUse418</code> is false. Rendered as plain text without HTML processing. This message is used only when the operator has not set a custom value for <code>$wgCrawlerProtectionRawDenialText</code>.",
-    "crawlerprotection-rawdenial-teapot": "Body of the raw HTTP 418 (I'm a Teapot) response sent when <code>$wgCrawlerProtectionUse418</code> is enabled. Rendered as plain text without HTML processing."
+	"@metadata": {
+		"authors": []
+	},
+	"crawlerprotection-desc": "Description of the [[mw:Extension:CrawlerProtection|CrawlerProtection]] extension, shown on [[Special:Version]]. {{desc}}",
+	"crawlerprotection-accessdenied-title": "Title of the access-denied page shown to anonymous users who attempt to access a protected action or special page. Displayed as the page heading.",
+	"crawlerprotection-accessdenied-text": "Body text of the access-denied page shown to anonymous users who attempt to access a protected action or special page. May contain wikitext.",
+	"crawlerprotection-rawdenial-text": "Body of the raw HTTP 403 response sent when <code>$wgCrawlerProtectionRawDenial</code> is enabled and <code>$wgCrawlerProtectionUse418</code> is false. Rendered as plain text without HTML processing. This message is used only when the operator has not set a custom value for <code>$wgCrawlerProtectionRawDenialText</code>.",
+	"crawlerprotection-rawdenial-teapot": "Body of the raw HTTP 418 (I'm a Teapot) response sent when <code>$wgCrawlerProtectionUse418</code> is enabled. Rendered as plain text without HTML processing."
 }
