@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"McDutchie"
+		]
+	},
+	"crawlerprotection-desc": "Een reeks beschermende maatregelen om wiki’s tegen crawlers te beschermen.",
+	"crawlerprotection-accessdenied-title": "Toegang geweigerd",
+	"crawlerprotection-accessdenied-text": "U moet aangemeld zijn om deze handeling te verrichten of deze speciale pagina te bekijken.",
+	"crawlerprotection-rawdenial-text": "403 Verboden. U moet aangemeld zijn om deze pagina te bekijken."
+}
