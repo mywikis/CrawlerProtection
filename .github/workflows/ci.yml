@@ -82,7 +82,7 @@ jobs:
       - name: Upload Semgrep results to GitHub Security
         # Pull requests from forks only get a read-only token, so the upload cannot succeed there.
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: semgrep.sarif
           category: semgrep-php
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload shell Semgrep results to GitHub Security
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: semgrep-shell.sarif
           category: semgrep-shell
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: trivy.sarif
           category: trivy
