@@ -160,6 +160,27 @@ class ResponseFactory {
 	}
 
 	/**
+	 * Expose the canonical-language aliases for a denied special page.
+	 *
+	 * Front-facing reverse proxies can use this header to discover the title
+	 * forms they should block before the request reaches MediaWiki.
+	 *
+	 * @param mixed $response WebResponse to write headers to, or null when the
+	 *  entry point cannot supply one.
+	 * @param string[] $aliases Full special-page titles to surface.
+	 * @return void
+	 */
+	public function markSpecialPageAliases( $response, array $aliases ): void {
+		if ( $response === null || $aliases === [] ) {
+			return;
+		}
+
+		$response->header(
+			'X-CrawlerProtection-Special-Page-Aliases: ' . implode( ', ', $aliases )
+		);
+	}
+
+	/**
 	 * Output a pretty 403 Access Denied page using i18n messages.
 	 *
 	 * @param OutputPage $output
