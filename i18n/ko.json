@@ -1,0 +1,11 @@
+{
+	"@metadata": {
+		"authors": [
+			"Tensama0415"
+		]
+	},
+	"crawlerprotection-desc": "크롤러로부터 위키를 보호하기 위한 일련의 보호 조치입니다.",
+	"crawlerprotection-accessdenied-title": "접근이 거부됨",
+	"crawlerprotection-accessdenied-text": "이 작업을 수행하거나 이 특별 문서를 보려면 로그인해야 합니다.",
+	"crawlerprotection-rawdenial-text": "403 Forbidden. 이 문서를 보려면 로그인해야 합니다."
+}
