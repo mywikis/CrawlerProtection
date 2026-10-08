@@ -1,7 +1,7 @@
 {
     "name": "CrawlerProtection",
     "author": "[https://mywikis.com MyWikis LLC]",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
     "descriptionmsg": "crawlerprotection-desc",
     "type": "hook",
@@ -69,6 +69,9 @@
         "CrawlerProtectionAllowedIPs": {
             "value": [],
             "merge_strategy": "provide_default"
+        },
+        "CrawlerProtectionAllowRevisionMetadata": {
+            "value": true
         },
         "CrawlerProtectionProtectRevisions": {
             "value": true
