@@ -1,12 +1,13 @@
 {
 	"@metadata": {
 		"authors": [
+			"Kghbln",
 			"Krabina",
 			"MyWikis LLC"
 		]
 	},
-	"crawlerprotection-desc": "Eine Reihe von Schutzmaßnahmen, um Wikis vor Crawlern zu schützen.",
+	"crawlerprotection-desc": "Bietet eine Reihe von Schutzmaßnahmen, um ein Wiki vor Crawlern zu schützen",
 	"crawlerprotection-accessdenied-title": "Zugriff verweigert",
-	"crawlerprotection-accessdenied-text": "Anmeldung erforderlich, um diese Aktion auszuführen oder die Spezialseite anzusehen.",
-	"crawlerprotection-rawdenial-text": "403 Zugriff verweigert. Sie müssen angemeldet sein, um diese Seite anzuzeigen."
+	"crawlerprotection-accessdenied-text": "Du musst angemeldet sein, um diese Aktion ausführen oder diese Spezialseite ansehen zu können.",
+	"crawlerprotection-rawdenial-text": "403 Zugriff verweigert. Du musst angemeldet sein, um diese Seite ansehen zu können."
 }
