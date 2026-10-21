@@ -50,7 +50,9 @@ return [
 				$services->get( 'CrawlerProtection.ResponseFactory' ),
 				new HookRunner( $services->getHookContainer() ),
 				defined( 'MW_ENTRY_POINT' ) && MW_ENTRY_POINT === 'cli',
-				LoggerFactory::getInstance( 'CrawlerProtection' )
+				LoggerFactory::getInstance( 'CrawlerProtection' ),
+				$services->getSpecialPageFactory(),
+				$services->getContentLanguage()
 			);
 		},
 ];
