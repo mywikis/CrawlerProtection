@@ -1,0 +1,10 @@
+{
+	"@metadata": {
+		"authors": [
+			"SleaY"
+		]
+	},
+	"crawlerprotection-accessdenied-title": "Accès refusé",
+	"crawlerprotection-accessdenied-text": "Vous devez être connecté pour effectuer cette action ou consulter cette page spéciale.",
+	"crawlerprotection-rawdenial-text": "403 Accès interdit. Vous devez être connecté pour consulter cette page."
+}
