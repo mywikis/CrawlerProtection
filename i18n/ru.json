@@ -1,0 +1,10 @@
+{
+	"@metadata": {
+		"authors": [
+			"Yurina Tatiana"
+		]
+	},
+	"crawlerprotection-accessdenied-title": "Доступ запрещён",
+	"crawlerprotection-accessdenied-text": "Вы должны войти, чтобы выполнить это действие или просмотреть эту служебную страницу.",
+	"crawlerprotection-rawdenial-text": "403 Forbidden. Вы должны войти, чтобы просмотреть эту страницу."
+}
