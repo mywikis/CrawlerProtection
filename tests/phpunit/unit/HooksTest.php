@@ -165,6 +165,31 @@ class HooksTest extends TestCase {
 	}
 
 	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 */
+	public function testOnSpecialPageBeforeExecuteAllowsTranscludedSpecialPage() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$context = $this->createMockContext( $user, $output, $request );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( 'Recentchanges' );
+		$special->method( 'getContext' )->willReturn( $context );
+		$special->method( 'including' )->willReturn( true );
+
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->expects( $this->never() )
+			->method( 'checkSpecialPage' );
+
+		$hooks = new Hooks( $service );
+		$result = $hooks->onSpecialPageBeforeExecute( $special, null );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
 	 * Create a mock context object.
 	 *
 	 * @param \PHPUnit\Framework\MockObject\MockObject $user Mock user object

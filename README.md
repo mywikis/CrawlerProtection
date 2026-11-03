@@ -20,6 +20,14 @@ consumers. Operators must opt in to API/REST protection by adding entries.
 The same bypass semantics apply on every entry point: registered users and IP
 addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
 
+Special pages transcluded into a wiki page, such as
+`{{Special:RecentChanges/10}}`, are not checked: they run with the arguments
+the page gives them, not with the visitor's request. Requests that render
+wikitext supplied by the client, such as `action=parse` with `text`, can
+therefore run a protected special page; add `'parse'` to
+`$wgCrawlerProtectedApiModules` and `'expandtemplates'` to
+`$wgCrawlerProtectedSpecialPages` if your wiki needs to close that path.
+
 # Configuration
 
 * `$wgCrawlerProtectedSpecialPages` - array of special pages to protect
