@@ -72,6 +72,7 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			'CrawlerProtectedSpecialPages'         => [ 'whatlinkshere', 'recentchangeslinked' ],
 			'CrawlerProtectedQueryParams'          => [ 'target' ],
 			'CrawlerProtectionAllowedIPs'          => [],
+			'CrawlerProtectionAllowRevisionMetadata' => true,
 			'CrawlerProtectionProtectRevisions'    => true,
 			'CrawlerProtectionTreatTempUsersAsAnon' => false,
 			'CrawlerProtectionTrustXForwardedFor'  => false,
@@ -762,5 +763,81 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			$api->getResult()->getResultData( [], [ 'Strip' => 'all' ] ),
 			'A registered user must not be denied'
 		);
+	}
+
+	/**
+	 * A Page Previews (Popups) style request for the timestamp of a single
+	 * page must reach the API even though "revisions" is protected.
+	 *
+	 * TextExtracts and PageImages are not installed here, so only the core
+	 * modules of the Popups "prop" list are requested.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkApiModules
+	 */
+	public function testApiCheckCanExecuteAllowsAnonymousRevisionMetadataQuery(): void {
+		// Arrange
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+		$this->useWebModeServiceInContainer();
+		$api = $this->makeApiMain(
+			[
+				'action' => 'query',
+				'prop' => 'info|revisions|info',
+				'formatversion' => '2',
+				'redirects' => '1',
+				'rvprop' => 'timestamp',
+				'inprop' => 'url',
+				'titles' => 'Main Page',
+			],
+			$this->makeAnonUser()
+		);
+
+		// Act
+		$api->execute();
+
+		// Assert
+		$this->assertArrayHasKey(
+			'query',
+			$api->getResult()->getResultData( [], [ 'Strip' => 'all' ] ),
+			'A revision-metadata query must execute normally'
+		);
+	}
+
+	/**
+	 * The same request asking for revision content must still be denied.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onApiCheckCanExecute
+	 * @covers \MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService::checkApiModules
+	 */
+	public function testApiCheckCanExecuteDeniesAnonymousRevisionContentQuery(): void {
+		// Arrange
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectedApiModules' => [ 'revisions' ],
+		] );
+		$this->useWebModeServiceInContainer();
+		$api = $this->makeApiMain(
+			[
+				'action' => 'query',
+				'prop' => 'info|revisions',
+				'rvprop' => 'timestamp|content',
+				'titles' => 'Main Page',
+			],
+			$this->makeAnonUser()
+		);
+
+		// Act
+		$denied = false;
+		try {
+			$api->execute();
+		} catch ( \Exception $e ) {
+			$denied = method_exists( $e, 'getStatusValue' )
+				// @phan-suppress-next-line PhanUndeclaredMethod ApiUsageException only
+				&& $e->getStatusValue()->hasMessage( 'crawlerprotection-accessdenied-text' );
+		}
+
+		// Assert
+		$this->assertTrue( $denied, 'A query for revision content must be denied' );
 	}
 }

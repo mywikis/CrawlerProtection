@@ -62,6 +62,35 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
   ```php
   $wgCrawlerProtectedApiModules = [ 'compare', 'parse', 'revisions', 'recentchanges', 'backlinks' ];
   ```
+* `$wgCrawlerProtectionAllowRevisionMetadata` - when `true` (default), an
+  anonymous `action=query` request is not denied on account of `'revisions'`
+  being in `$wgCrawlerProtectedApiModules` if it only asks for the timestamp
+  of the latest revision of a single page. This keeps
+  [Page Previews](https://www.mediawiki.org/wiki/Extension:Popups) working
+  for anonymous readers: its preview request is
+  `action=query&prop=info|extracts|pageimages|revisions|info&rvprop=timestamp&titles=<page>`
+  (plus `formatversion`, `redirects`, `inprop`, and the `ex*` and `pi*`
+  parameters of TextExtracts and PageImages), and without this exemption every
+  preview fails with "There was an issue displaying this preview." A request
+  is let through only when all of the following hold:
+  - `revisions` is the only protected module in the request; any other
+    protected module (or a protected `query`) still denies it;
+  - it names exactly one page through a single `titles` or `pageids` value,
+    and uses neither `generator` nor `revids`;
+  - `rvprop` is present and contains only `timestamp`. A missing `rvprop`
+    does not qualify, because the API then returns its default props, which
+    include the user and the edit summary;
+  - no other `rv*` parameter is present (`rvlimit`, `rvstart`, `rvend`,
+    `rvstartid`, `rvendid`, `rvdir`, `rvuser`, `rvexcludeuser`, `rvtag`,
+    `rvcontinue`, `rvslots`, `rvsection`, `rvparse`, `rvexpandtemplates`,
+    `rvgeneratexml`, `rvdiffto`, `rvdifftotext`, `rvdifftotextpst`,
+    `rvcontentformat` and `rvcontentformat-{slot}`), since each of them pages
+    through revisions or reads revision content.
+
+  Multi-value parameters are recognised in both the `|` and the
+  leading-`\x1f` form. Set to `false` to deny every anonymous request that
+  involves a protected `revisions` module. The `CrawlerProtectionShouldDeny`
+  hook still receives the final decision and can override it.
 * `$wgCrawlerProtectedRestPaths` - array of REST API path glob patterns to
   block for anonymous users (default: `[]`). Each pattern is tested with
   `fnmatch()` with the `FNM_PATHNAME` flag, so `*` matches any single path

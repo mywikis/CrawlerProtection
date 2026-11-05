@@ -53,10 +53,21 @@ class CrawlerProtectionService {
 		'CrawlerProtectedRestPaths',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
+		'CrawlerProtectionAllowRevisionMetadata',
 		'CrawlerProtectionProtectRevisions',
 		'CrawlerProtectionTreatTempUsersAsAnon',
 		'CrawlerProtectionTrustXForwardedFor',
 	];
+
+	/**
+	 * Values of the "rvprop" parameter that $wgCrawlerProtectionAllowRevisionMetadata
+	 * lets through. Page Previews (Popups) asks for "timestamp" only; every other
+	 * value exposes revision content, its author or edit summary, or more than
+	 * the bare metadata the previews need.
+	 *
+	 * @var string[]
+	 */
+	private const REVISION_METADATA_PROPS = [ 'timestamp' ];
 
 	/** @var ServiceOptions */
 	private ServiceOptions $options;
@@ -328,6 +339,10 @@ class CrawlerProtectionService {
 					break;
 				}
 			}
+
+			if ( $shouldDeny && $this->isRevisionMetadataQuery( $moduleNames, $request ) ) {
+				$shouldDeny = false;
+			}
 		}
 
 		$this->hookRunner->onCrawlerProtectionShouldDeny(
@@ -350,6 +365,99 @@ class CrawlerProtectionService {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Determine whether an action=query request only asks the "revisions"
+	 * module for metadata of the latest revision of a single page, which
+	 * $wgCrawlerProtectionAllowRevisionMetadata lets anonymous users through.
+	 *
+	 * Page Previews (Popups) sends action=query&prop=...|revisions&rvprop=timestamp
+	 * for one title, so protecting "revisions" would otherwise break previews
+	 * for anonymous readers. The rules are deliberately narrow:
+	 * - "revisions" must be the only protected module in the request;
+	 * - exactly one page is named by "titles" or "pageids", and neither a
+	 *   generator nor "revids" is used, so the request cannot fan out;
+	 * - "rvprop" is given explicitly and holds only REVISION_METADATA_PROPS,
+	 *   because without it the API falls back to props that include the
+	 *   comment and user;
+	 * - no other "rv" parameter is present, since all of them page through
+	 *   revisions or read revision content (rvlimit, rvslots, rvsection, ...).
+	 *
+	 * @param string[] $moduleNames Module names involved in the request
+	 * @param WebRequest|null $request
+	 * @return bool
+	 */
+	private function isRevisionMetadataQuery( array $moduleNames, $request ): bool {
+		if ( $request === null
+			|| !$this->options->get( 'CrawlerProtectionAllowRevisionMetadata' )
+			|| strtolower( $moduleNames[0] ?? '' ) !== 'query'
+		) {
+			return false;
+		}
+
+		$protectedModules = array_unique( array_map(
+			'strtolower',
+			array_filter( $moduleNames, [ $this, 'isProtectedApiModule' ] )
+		) );
+		if ( array_values( $protectedModules ) !== [ 'revisions' ] ) {
+			return false;
+		}
+
+		if ( $request->getVal( 'generator' ) !== null || $request->getVal( 'revids' ) !== null ) {
+			return false;
+		}
+
+		$titles = $request->getVal( 'titles' );
+		$pageIds = $request->getVal( 'pageids' );
+		if ( $titles !== null && $pageIds !== null ) {
+			return false;
+		}
+		$pageTarget = $titles ?? $pageIds;
+		if ( $pageTarget === null ) {
+			return false;
+		}
+		$pages = self::splitApiMultiValue( $pageTarget );
+		if ( count( $pages ) !== 1 || $pages[0] === '' ) {
+			return false;
+		}
+
+		$revisionProps = $request->getVal( 'rvprop' );
+		if ( $revisionProps === null ) {
+			return false;
+		}
+		foreach ( self::splitApiMultiValue( $revisionProps ) as $prop ) {
+			if ( !in_array( $prop, self::REVISION_METADATA_PROPS, true ) ) {
+				return false;
+			}
+		}
+
+		foreach ( array_keys( $request->getValues() ) as $name ) {
+			$name = strtolower( (string)$name );
+			if ( strncmp( $name, 'rv', 2 ) === 0 && $name !== 'rvprop' ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Split a multi-value Action API parameter into its values.
+	 *
+	 * Like ApiBase, this uses "\x1f" as the separator when the value starts
+	 * with that character, and "|" otherwise. Values are returned as sent:
+	 * they are neither trimmed nor filtered for empty strings.
+	 *
+	 * @since 1.8.0
+	 * @param string $value
+	 * @return string[]
+	 */
+	public static function splitApiMultiValue( string $value ): array {
+		if ( substr( $value, 0, 1 ) === "\x1f" ) {
+			return explode( "\x1f", substr( $value, 1 ) );
+		}
+		return explode( '|', $value );
 	}
 
 	/**

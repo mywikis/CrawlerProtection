@@ -178,6 +178,13 @@ namespace MediaWiki\Request {
 			return $default;
 		}
 
+		/**
+		 * @return array
+		 */
+		public function getValues() {
+			return [];
+		}
+
 		public function getIP(): string {
 			return '127.0.0.1';
 		}

@@ -172,10 +172,7 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 			if ( $value === null || $value === '' ) {
 				continue;
 			}
-			// MediaWiki uses "\x1f" as the separator when a multi-value
-			// parameter starts with that character, and "|" otherwise.
-			$separator = substr( $value, 0, 1 ) === "\x1f" ? "\x1f" : '|';
-			foreach ( explode( $separator, $value ) as $subModule ) {
+			foreach ( CrawlerProtectionService::splitApiMultiValue( $value ) as $subModule ) {
 				$subModule = trim( $subModule );
 				if ( $subModule !== '' ) {
 					$names[] = $subModule;

@@ -61,6 +61,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param bool $treatTempUsersAsAnon
 	 * @param callable[] $shouldDenyHandlers Handlers for CrawlerProtectionShouldDeny
 	 * @param bool $trustXForwardedFor
+	 * @param bool $allowRevisionMetadata
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
@@ -75,7 +76,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 		array $protectedRestPaths = [],
 		bool $treatTempUsersAsAnon = false,
 		array $shouldDenyHandlers = [],
-		bool $trustXForwardedFor = false
+		bool $trustXForwardedFor = false,
+		bool $allowRevisionMetadata = true
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
@@ -86,6 +88,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedRestPaths' => $protectedRestPaths,
 				'CrawlerProtectedSpecialPages' => $protectedPages,
 				'CrawlerProtectionAllowedIPs' => $allowedIPs,
+				'CrawlerProtectionAllowRevisionMetadata' => $allowRevisionMetadata,
 				'CrawlerProtectionProtectRevisions' => $protectRevisions,
 				'CrawlerProtectionTreatTempUsersAsAnon' => $treatTempUsersAsAnon,
 				'CrawlerProtectionTrustXForwardedFor' => $trustXForwardedFor,
@@ -1384,6 +1387,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => [],
 				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionAllowRevisionMetadata' => true,
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
 				'CrawlerProtectionTrustXForwardedFor' => false,
@@ -1418,6 +1422,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => [],
 				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionAllowRevisionMetadata' => true,
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
 				'CrawlerProtectionTrustXForwardedFor' => false,
@@ -1457,6 +1462,7 @@ class CrawlerProtectionServiceTest extends TestCase {
 				'CrawlerProtectedRestPaths' => [],
 				'CrawlerProtectedSpecialPages' => 'WhatLinksHere',
 				'CrawlerProtectionAllowedIPs' => [],
+				'CrawlerProtectionAllowRevisionMetadata' => true,
 				'CrawlerProtectionProtectRevisions' => true,
 				'CrawlerProtectionTreatTempUsersAsAnon' => false,
 				'CrawlerProtectionTrustXForwardedFor' => false,
@@ -1673,6 +1679,404 @@ class CrawlerProtectionServiceTest extends TestCase {
 			[], [], [ '1.2.3.4' ], null, true, [], false, [ 'revisions' ]
 		);
 		$this->assertFalse( $service->checkApiModule( 'revisions', $user ) );
+	}
+
+	// ---------------------------------------------------------------
+	// CrawlerProtectionAllowRevisionMetadata tests
+	// ---------------------------------------------------------------
+
+	/**
+	 * Parameters of the preview request sent by the plain MediaWiki API
+	 * gateway of Page Previews (Popups), identical on REL1_39, REL1_43 and
+	 * master (src/gateway/mediawiki.js).
+	 */
+	private const POPUPS_PARAMS = [
+		'action' => 'query',
+		'format' => 'json',
+		'prop' => 'info|extracts|pageimages|revisions|info',
+		'formatversion' => '2',
+		'redirects' => 'true',
+		'exintro' => 'true',
+		'exchars' => '525',
+		'explaintext' => 'true',
+		'exsectionformat' => 'plain',
+		'piprop' => 'thumbnail',
+		'pithumbsize' => '320',
+		'pilicense' => 'any',
+		'rvprop' => 'timestamp',
+		'inprop' => 'url',
+		'titles' => 'Main_Page',
+		'smaxage' => '300',
+		'maxage' => '300',
+		'uselang' => 'content',
+	];
+
+	/** Module names the hook derives from POPUPS_PARAMS. */
+	private const POPUPS_MODULES = [ 'query', 'info', 'extracts', 'pageimages', 'revisions', 'info' ];
+
+	/**
+	 * Build an anonymous user mock.
+	 *
+	 * @return \PHPUnit\Framework\MockObject\MockObject
+	 */
+	private function newAnonUserMock() {
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+		return $user;
+	}
+
+	/**
+	 * Build a request mock that serves the given parameters.
+	 *
+	 * @param array $params
+	 * @return \PHPUnit\Framework\MockObject\MockObject
+	 */
+	private function newApiRequestMock( array $params ) {
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnCallback(
+			static function ( $name, $default = null ) use ( $params ) {
+				return $params[$name] ?? $default;
+			}
+		);
+		$request->method( 'getValues' )->willReturn( $params );
+		return $request;
+	}
+
+	/**
+	 * @covers ::checkApiModules
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryAllowsPopupsRequest() {
+		// Arrange
+		$user = $this->newAnonUserMock();
+		$request = $this->newApiRequestMock( self::POPUPS_PARAMS );
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->never() )->method( 'markDenied' );
+		$service = $this->buildService(
+			[], [], [], $responseFactory, true, [], false, [ 'revisions' ]
+		);
+
+		// Act
+		$result = $service->checkApiModules( self::POPUPS_MODULES, $user, $request );
+
+		// Assert
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryAllowsSinglePageId() {
+		// Arrange
+		$params = self::POPUPS_PARAMS;
+		unset( $params['titles'] );
+		$params['pageids'] = '42';
+		$service = $this->buildService( [], [], [], null, true, [], false, [ 'revisions' ] );
+
+		// Act
+		$result = $service->checkApiModules(
+			self::POPUPS_MODULES, $this->newAnonUserMock(), $this->newApiRequestMock( $params )
+		);
+
+		// Assert
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryAcceptsUnitSeparatorForm() {
+		// Arrange
+		$params = [
+			'action' => 'query',
+			'prop' => "\x1finfo\x1frevisions",
+			'rvprop' => "\x1ftimestamp",
+			'titles' => "\x1fFoo|Bar",
+		];
+		$service = $this->buildService( [], [], [], null, true, [], false, [ 'revisions' ] );
+
+		// Act
+		$result = $service->checkApiModules(
+			[ 'query', 'info', 'revisions' ], $this->newAnonUserMock(), $this->newApiRequestMock( $params )
+		);
+
+		// Assert
+		$this->assertTrue( $result, 'A "|" inside a "\x1f"-separated value is part of the single title' );
+	}
+
+	/**
+	 * Every request here deviates from the Popups request in one respect that
+	 * must keep the protected "revisions" module denied.
+	 *
+	 * @covers ::isRevisionMetadataQuery
+	 * @dataProvider provideDeniedRevisionRequests
+	 *
+	 * @param array $overrides Parameters to set; null removes a parameter
+	 */
+	public function testRevisionMetadataQueryDeniesNonMetadataRequest( array $overrides ) {
+		// Arrange
+		$params = array_filter(
+			array_merge( self::POPUPS_PARAMS, $overrides ),
+			static function ( $value ) {
+				return $value !== null;
+			}
+		);
+		$service = $this->buildService( [], [], [], null, true, [], false, [ 'revisions' ] );
+
+		// Act
+		$result = $service->checkApiModules(
+			self::POPUPS_MODULES, $this->newAnonUserMock(), $this->newApiRequestMock( $params )
+		);
+
+		// Assert
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function provideDeniedRevisionRequests(): array {
+		$cases = [];
+
+		// Every rvprop value other than "timestamp", in MediaWiki 1.39 and 1.43.
+		$disallowedProps = [
+			'ids', 'flags', 'user', 'userid', 'size', 'slotsize', 'sha1', 'slotsha1',
+			'contentmodel', 'comment', 'parsedcomment', 'content', 'tags', 'roles', 'parsetree',
+		];
+		foreach ( $disallowedProps as $prop ) {
+			$cases["rvprop=$prop"] = [ [ 'rvprop' => $prop ] ];
+			$cases["rvprop=timestamp|$prop"] = [ [ 'rvprop' => "timestamp|$prop" ] ];
+		}
+		$cases['rvprop=timestamp\x1fcontent'] = [ [ 'rvprop' => "\x1ftimestamp\x1fcontent" ] ];
+		$cases['empty rvprop'] = [ [ 'rvprop' => '' ] ];
+		$cases['rvprop with padding'] = [ [ 'rvprop' => ' timestamp' ] ];
+		$cases['missing rvprop'] = [ [ 'rvprop' => null ] ];
+
+		// Every other parameter of ApiQueryRevisions(Base) in MediaWiki 1.39 and 1.43.
+		$pagingAndContentParams = [
+			'rvslots' => 'main',
+			'rvlimit' => '50',
+			'rvexpandtemplates' => '1',
+			'rvgeneratexml' => '1',
+			'rvparse' => '1',
+			'rvsection' => '0',
+			'rvdiffto' => 'prev',
+			'rvdifftotext' => 'text',
+			'rvdifftotextpst' => '1',
+			'rvcontentformat' => 'text/x-wiki',
+			'rvcontentformat-main' => 'text/x-wiki',
+			'rvstartid' => '1',
+			'rvendid' => '2',
+			'rvstart' => '2020-01-01T00:00:00Z',
+			'rvend' => '2021-01-01T00:00:00Z',
+			'rvdir' => 'newer',
+			'rvuser' => 'Example',
+			'rvexcludeuser' => 'Example',
+			'rvtag' => 'mw-reverted',
+			'rvcontinue' => '20200101000000|1',
+			'RVLIMIT' => '50',
+		];
+		foreach ( $pagingAndContentParams as $name => $value ) {
+			$cases[$name] = [ [ $name => $value ] ];
+		}
+
+		$cases['two titles'] = [ [ 'titles' => 'Foo|Bar' ] ];
+		$cases['two titles, \x1f form'] = [ [ 'titles' => "\x1fFoo\x1fBar" ] ];
+		$cases['empty titles'] = [ [ 'titles' => '' ] ];
+		$cases['trailing separator'] = [ [ 'titles' => 'Foo|' ] ];
+		$cases['no page'] = [ [ 'titles' => null ] ];
+		$cases['two pageids'] = [ [ 'titles' => null, 'pageids' => '1|2' ] ];
+		$cases['titles and pageids'] = [ [ 'pageids' => '1' ] ];
+		$cases['revids'] = [ [ 'revids' => '1' ] ];
+		$cases['generator'] = [ [ 'generator' => 'allpages' ] ];
+
+		return $cases;
+	}
+
+	/**
+	 * A generator turns the request into a multi-page query, so the hook
+	 * passes the generator module as well.
+	 *
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryDeniesGeneratorModule() {
+		// Arrange
+		$params = [
+			'action' => 'query',
+			'prop' => 'revisions',
+			'rvprop' => 'timestamp',
+			'generator' => 'links',
+			'titles' => 'Foo',
+		];
+		$service = $this->buildService( [], [], [], null, true, [], false, [ 'revisions' ] );
+
+		// Act
+		$result = $service->checkApiModules(
+			[ 'query', 'revisions', 'links' ], $this->newAnonUserMock(), $this->newApiRequestMock( $params )
+		);
+
+		// Assert
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @covers ::isRevisionMetadataQuery
+	 * @dataProvider provideOtherProtectedModules
+	 *
+	 * @param string[] $protectedModules
+	 */
+	public function testRevisionMetadataQueryDeniesOtherProtectedModule( array $protectedModules ) {
+		// Arrange
+		$service = $this->buildService( [], [], [], null, true, [], false, $protectedModules );
+
+		// Act
+		$result = $service->checkApiModules(
+			self::POPUPS_MODULES, $this->newAnonUserMock(), $this->newApiRequestMock( self::POPUPS_PARAMS )
+		);
+
+		// Assert
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function provideOtherProtectedModules(): array {
+		return [
+			'second protected sub-module' => [ [ 'revisions', 'extracts' ] ],
+			'protected query action' => [ [ 'revisions', 'query' ] ],
+			'only another sub-module' => [ [ 'pageimages' ] ],
+		];
+	}
+
+	/**
+	 * With the flag off, the Popups request is denied as before 1.8.0.
+	 *
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryDisabledRestoresDenial() {
+		// Arrange
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ], [], false, [], false, false
+		);
+
+		// Act
+		$result = $service->checkApiModules(
+			self::POPUPS_MODULES, $this->newAnonUserMock(), $this->newApiRequestMock( self::POPUPS_PARAMS )
+		);
+
+		// Assert
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * The exemption only applies to action=query, not to a direct check of
+	 * the "revisions" module name.
+	 *
+	 * @covers ::isRevisionMetadataQuery
+	 */
+	public function testRevisionMetadataQueryRequiresQueryAction() {
+		// Arrange
+		$service = $this->buildService( [], [], [], null, true, [], false, [ 'revisions' ] );
+
+		// Act
+		$result = $service->checkApiModule(
+			'revisions', $this->newAnonUserMock(), $this->newApiRequestMock( self::POPUPS_PARAMS )
+		);
+
+		// Assert
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * Registered users are never denied, whether or not the flag is set and
+	 * whatever revision props they request.
+	 *
+	 * @covers ::checkApiModules
+	 * @dataProvider provideRevisionMetadataFlag
+	 *
+	 * @param bool $allowRevisionMetadata
+	 */
+	public function testRevisionMetadataQueryLeavesRegisteredUsersAlone( bool $allowRevisionMetadata ) {
+		// Arrange
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( true );
+		$params = array_merge( self::POPUPS_PARAMS, [ 'rvprop' => 'content', 'rvlimit' => '50' ] );
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ], [], false, [], false, $allowRevisionMetadata
+		);
+
+		// Act
+		$result = $service->checkApiModules( self::POPUPS_MODULES, $user, $this->newApiRequestMock( $params ) );
+
+		// Assert
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function provideRevisionMetadataFlag(): array {
+		return [
+			'flag on' => [ true ],
+			'flag off' => [ false ],
+		];
+	}
+
+	/**
+	 * CrawlerProtectionShouldDeny receives the decision after the exemption,
+	 * and can still deny the request.
+	 *
+	 * @covers ::checkApiModules
+	 */
+	public function testRevisionMetadataQueryPassesFinalDecisionToHook() {
+		// Arrange
+		$seen = null;
+		$handler = static function ( $user, $request, $entryPoint, $specialPageName, &$shouldDeny ) use ( &$seen ) {
+			$seen = $shouldDeny;
+			$shouldDeny = true;
+		};
+		$service = $this->buildService(
+			[], [], [], null, true, [], false, [ 'revisions' ], [], false, [ $handler ]
+		);
+
+		// Act
+		$result = $service->checkApiModules(
+			self::POPUPS_MODULES, $this->newAnonUserMock(), $this->newApiRequestMock( self::POPUPS_PARAMS )
+		);
+
+		// Assert
+		$this->assertFalse( $seen, 'The hook must see the request as allowed' );
+		$this->assertFalse( $result, 'The hook must be able to deny it anyway' );
+	}
+
+	/**
+	 * @covers ::splitApiMultiValue
+	 * @dataProvider provideApiMultiValues
+	 *
+	 * @param string $value
+	 * @param string[] $expected
+	 */
+	public function testSplitApiMultiValue( string $value, array $expected ) {
+		// Act
+		$result = CrawlerProtectionService::splitApiMultiValue( $value );
+
+		// Assert
+		$this->assertSame( $expected, $result );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function provideApiMultiValues(): array {
+		return [
+			'single value' => [ 'revisions', [ 'revisions' ] ],
+			'pipe separated' => [ 'info|revisions', [ 'info', 'revisions' ] ],
+			'unit separator' => [ "\x1finfo\x1frevisions", [ 'info', 'revisions' ] ],
+			'pipe inside unit separator form' => [ "\x1fa|b", [ 'a|b' ] ],
+			'empty' => [ '', [ '' ] ],
+			'values kept as sent' => [ ' a||b ', [ ' a', '', 'b ' ] ],
+		];
 	}
 
 	// ---------------------------------------------------------------
