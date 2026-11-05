@@ -157,6 +157,10 @@ namespace MediaWiki\SpecialPage {
 		public function getContext() {
 			return null;
 		}
+
+		public function including( $x = null ) {
+			return false;
+		}
 	}
 }
 

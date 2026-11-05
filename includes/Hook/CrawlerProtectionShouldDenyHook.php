@@ -58,7 +58,8 @@ interface CrawlerProtectionShouldDenyHook {
 	 * any of its entry points, including requests by registered users and
 	 * requests that touch no protected resource, so handlers must inspect
 	 * $shouldDeny and the request themselves rather than assuming a denial is
-	 * pending.
+	 * pending. It does not run for a special page transcluded into a wiki page
+	 * while $wgCrawlerProtectionAllowTranscludedSpecialPages is true.
 	 *
 	 * @since 1.7.0
 	 *

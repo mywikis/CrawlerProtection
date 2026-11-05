@@ -72,6 +72,7 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			'CrawlerProtectedSpecialPages'         => [ 'whatlinkshere', 'recentchangeslinked' ],
 			'CrawlerProtectedQueryParams'          => [ 'target' ],
 			'CrawlerProtectionAllowedIPs'          => [],
+			'CrawlerProtectionAllowTranscludedSpecialPages' => false,
 			'CrawlerProtectionProtectRevisions'    => true,
 			'CrawlerProtectionTreatTempUsersAsAnon' => false,
 			'CrawlerProtectionTrustXForwardedFor'  => false,
@@ -608,6 +609,78 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 
 		$this->assertFalse( $service->checkRestPath( '/page/Main_Page/history', $user, $request ) );
 		$this->assertTrue( $service->checkRestPath( '/page/Main_Page/bare', $user, $request ) );
+	}
+
+	// ---------------------------------------------------------------
+	// Hooks::onSpecialPageBeforeExecute through the parser
+	// ---------------------------------------------------------------
+
+	/**
+	 * Render wikitext into a real OutputPage, as a page view does, and return
+	 * the HTML.
+	 *
+	 * @param string $wikitext
+	 * @return string
+	 */
+	private function renderWikitext( string $wikitext ): string {
+		$output = $this->makeOutputPage();
+		$output->addWikiTextAsContent( $wikitext );
+		return $output->getHTML();
+	}
+
+	/**
+	 * Create the page "Linker" linking to "Test", so that a transcluded
+	 * Special:WhatLinksHere/Test has a row to list; without one it renders
+	 * nothing at all.
+	 *
+	 * DeferredUpdates moved into the MediaWiki\Deferred namespace after MW
+	 * 1.39, so the class is resolved at run time.
+	 */
+	private function createPageLinkingToTest(): void {
+		$this->editPage( 'Linker', '[[Test]]' );
+
+		$deferredUpdates = class_exists( \MediaWiki\Deferred\DeferredUpdates::class )
+			? \MediaWiki\Deferred\DeferredUpdates::class
+			: 'DeferredUpdates';
+		$deferredUpdates::doUpdates();
+	}
+
+	/**
+	 * By default a protected special page transcluded into a wiki page is
+	 * checked like a direct view, so an anonymous viewer gets the denial
+	 * instead of the special page.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onSpecialPageBeforeExecute
+	 */
+	public function testTranscludedProtectedSpecialPageIsDeniedByDefault(): void {
+		$this->overrideCrawlerProtectionConfig();
+		$this->useWebModeServiceInContainer();
+		$this->createPageLinkingToTest();
+
+		$html = $this->renderWikitext( '{{Special:WhatLinksHere/Test}}' );
+
+		$this->assertStringContainsString(
+			wfMessage( 'crawlerprotection-accessdenied-text' )->text(),
+			$html
+		);
+	}
+
+	/**
+	 * With $wgCrawlerProtectionAllowTranscludedSpecialPages a protected special
+	 * page transcluded into a wiki page renders for an anonymous viewer.
+	 *
+	 * @covers \MediaWiki\Extension\CrawlerProtection\Hooks::onSpecialPageBeforeExecute
+	 */
+	public function testTranscludedProtectedSpecialPageRendersWhenAllowed(): void {
+		$this->overrideCrawlerProtectionConfig( [
+			'CrawlerProtectionAllowTranscludedSpecialPages' => true,
+		] );
+		$this->useWebModeServiceInContainer();
+		$this->createPageLinkingToTest();
+
+		$html = $this->renderWikitext( '{{Special:WhatLinksHere/Test}}' );
+
+		$this->assertStringContainsString( 'Linker', $html );
 	}
 
 	// ---------------------------------------------------------------

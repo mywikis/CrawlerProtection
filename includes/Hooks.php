@@ -107,11 +107,20 @@ class Hooks implements MediaWikiPerformActionHook, SpecialPageBeforeExecuteHook 
 	/**
 	 * Block protected special pages for anonymous users.
 	 *
+	 * With $wgCrawlerProtectionAllowTranscludedSpecialPages, a special page
+	 * transcluded into a wiki page is not checked: it runs with the arguments
+	 * written in the wiki page rather than the visitor's request, and in miser
+	 * mode it runs as an anonymous user regardless of who views the page.
+	 *
 	 * @param SpecialPage $special
 	 * @param string|null $subPage
 	 * @return bool False to abort execution
 	 */
 	public function onSpecialPageBeforeExecute( $special, $subPage ) {
+		if ( $special->including() && $this->crawlerProtectionService->allowsTranscludedSpecialPages() ) {
+			return true;
+		}
+
 		return $this->crawlerProtectionService->checkSpecialPage(
 			$special->getName(),
 			$special->getContext()->getOutput(),
