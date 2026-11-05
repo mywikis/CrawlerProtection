@@ -20,13 +20,21 @@ consumers. Operators must opt in to API/REST protection by adding entries.
 The same bypass semantics apply on every entry point: registered users and IP
 addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
 
-Special pages transcluded into a wiki page, such as
-`{{Special:RecentChanges/10}}`, are not checked: they run with the arguments
-the page gives them, not with the visitor's request. Requests that render
-wikitext supplied by the client, such as `action=parse` with `text`, can
-therefore run a protected special page; add `'parse'` to
-`$wgCrawlerProtectedApiModules` and `'expandtemplates'` to
-`$wgCrawlerProtectedSpecialPages` if your wiki needs to close that path.
+With `$wgCrawlerProtectionAllowTranscludedSpecialPages` set to `true`, special
+pages transcluded into a wiki page, such as `{{Special:RecentChanges/10}}`, are
+not checked. A transcluded special page runs with the arguments written in the
+wiki page rather than the parameters of the visitor's request, and MediaWiki
+may run it as an anonymous user even when the visitor is logged in, so
+checking it would only break ordinary page views.
+
+As a result, any request that renders wikitext supplied by the client can then
+run a protected special page. Examples include `action=parse` with the `text`
+parameter, `Special:ExpandTemplates`, anonymous edit previews, and the REST
+endpoint that transforms wikitext to HTML. To close these paths, add `'parse'`
+to `$wgCrawlerProtectedApiModules`, add `'expandtemplates'` to
+`$wgCrawlerProtectedSpecialPages`, and, on MediaWiki 1.44 and later, add the
+transform endpoint to `$wgCrawlerProtectedRestPaths`. Protecting `parse` also
+blocks live previews and some gadgets for anonymous users.
 
 # Configuration
 
@@ -39,6 +47,13 @@ therefore run a protected special page; add `'parse'` to
   `curl -s "[YOURWIKI]api.php?action=query&meta=siteinfo&siprop=specialpagealiases&format=json" | jq -r '.query.specialpagealiases[].aliases[]' | sort`
   Of course certain Specials MUST be allowed like Special:Login so do not block
   everything.
+* `$wgCrawlerProtectionAllowTranscludedSpecialPages` - when `true`, special
+  pages transcluded into a wiki page are not checked (default: `false`). With
+  the default, a wiki page that transcludes a protected special page can show
+  the denial in its place, also to logged-in visitors, and with
+  `$wgCrawlerProtectionRawDenial` the denial replaces the whole page. See
+  [Entry-point coverage](#entry-point-coverage) for the requests that setting it
+  to `true` opens up.
 * `$wgCrawlerProtectedActions` - array of MediaWiki action names to block for
   anonymous users (default: `[ 'history' ]`). Removing `'history'` from this
   list disables protection of the history-listing page but does not affect
@@ -194,7 +209,9 @@ at that point is still honoured. The hook runs for every web request that
 reaches CrawlerProtection at any of its entry points (but not on the command
 line), including requests by registered users and requests that touch no
 protected resource, so handlers must inspect `$shouldDeny` and the request
-themselves rather than assuming a denial is pending.
+themselves rather than assuming a denial is pending. It does not run for a
+special page transcluded into a wiki page while
+`$wgCrawlerProtectionAllowTranscludedSpecialPages` is `true`.
 
 Example, allowing anonymous access when a request carries a secret header:
 

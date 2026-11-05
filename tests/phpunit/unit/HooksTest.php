@@ -167,26 +167,50 @@ class HooksTest extends TestCase {
 	/**
 	 * @covers ::onSpecialPageBeforeExecute
 	 */
-	public function testOnSpecialPageBeforeExecuteAllowsTranscludedSpecialPage() {
-		$output = $this->createMock( self::$outputPageClassName );
-		$user = $this->createMock( self::$userClassName );
-		$request = $this->createMock( self::$webRequestClassName );
-
-		$context = $this->createMockContext( $user, $output, $request );
-
-		$special = $this->createMock( self::$specialPageClassName );
-		$special->method( 'getName' )->willReturn( 'Recentchanges' );
-		$special->method( 'getContext' )->willReturn( $context );
-		$special->method( 'including' )->willReturn( true );
-
+	public function testOnSpecialPageBeforeExecuteAllowsTranscludedSpecialPageWhenConfigured() {
 		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->method( 'allowsTranscludedSpecialPages' )->willReturn( true );
 		$service->expects( $this->never() )
 			->method( 'checkSpecialPage' );
 
 		$hooks = new Hooks( $service );
-		$result = $hooks->onSpecialPageBeforeExecute( $special, null );
+		$result = $hooks->onSpecialPageBeforeExecute( $this->createTranscludedSpecialPage(), null );
 
 		$this->assertTrue( $result );
+	}
+
+	/**
+	 * @covers ::onSpecialPageBeforeExecute
+	 */
+	public function testOnSpecialPageBeforeExecuteChecksTranscludedSpecialPageByDefault() {
+		$service = $this->createMock( CrawlerProtectionService::class );
+		$service->method( 'allowsTranscludedSpecialPages' )->willReturn( false );
+		$service->expects( $this->once() )
+			->method( 'checkSpecialPage' )
+			->willReturn( false );
+
+		$hooks = new Hooks( $service );
+		$result = $hooks->onSpecialPageBeforeExecute( $this->createTranscludedSpecialPage(), null );
+
+		$this->assertFalse( $result );
+	}
+
+	/**
+	 * Create a mock special page that is being transcluded into a wiki page.
+	 *
+	 * @return \PHPUnit\Framework\MockObject\MockObject
+	 */
+	private function createTranscludedSpecialPage() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+
+		$special = $this->createMock( self::$specialPageClassName );
+		$special->method( 'getName' )->willReturn( 'Recentchanges' );
+		$special->method( 'getContext' )->willReturn( $this->createMockContext( $user, $output, $request ) );
+		$special->method( 'including' )->willReturn( true );
+
+		return $special;
 	}
 
 	/**

@@ -53,6 +53,7 @@ class CrawlerProtectionService {
 		'CrawlerProtectedRestPaths',
 		'CrawlerProtectedSpecialPages',
 		'CrawlerProtectionAllowedIPs',
+		'CrawlerProtectionAllowTranscludedSpecialPages',
 		'CrawlerProtectionProtectRevisions',
 		'CrawlerProtectionTreatTempUsersAsAnon',
 		'CrawlerProtectionTrustXForwardedFor',
@@ -280,6 +281,16 @@ class CrawlerProtectionService {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Whether special pages transcluded into a wiki page are exempt from the
+	 * special page check.
+	 *
+	 * @return bool
+	 */
+	public function allowsTranscludedSpecialPages(): bool {
+		return (bool)$this->options->get( 'CrawlerProtectionAllowTranscludedSpecialPages' );
 	}
 
 	/**
