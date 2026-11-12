@@ -155,7 +155,9 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 			new HookRunner( $this->getServiceContainer()->getHookContainer() ),
 			// false = web-request mode — not CLI
 			false,
-			LoggerFactory::getInstance( 'CrawlerProtection' )
+			LoggerFactory::getInstance( 'CrawlerProtection' ),
+			$this->getServiceContainer()->getSpecialPageFactory(),
+			$this->getServiceContainer()->getContentLanguage()
 		);
 	}
 
@@ -375,6 +377,10 @@ class CrawlerProtectionIntegrationTest extends MediaWikiIntegrationTestCase {
 		if ( method_exists( $output, 'getStatusCode' ) ) {
 			$this->assertSame( 403, $output->getStatusCode() );
 		}
+		$this->assertSame(
+			'Special:WhatLinksHere',
+			$output->getRequest()->response()->getHeader( 'X-CrawlerProtection-Special-Page-Aliases' )
+		);
 	}
 
 	/**

@@ -27,8 +27,10 @@ namespace MediaWiki\Extension\CrawlerProtection;
 
 use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
+use MediaWiki\Language\Language;
 use MediaWiki\Output\OutputPage;
 use MediaWiki\Request\WebRequest;
+use MediaWiki\SpecialPage\SpecialPageFactory;
 use MediaWiki\User\User;
 use Psr\Log\LoggerInterface;
 use Wikimedia\IPUtils;
@@ -73,6 +75,12 @@ class CrawlerProtectionService {
 	/** @var LoggerInterface */
 	private LoggerInterface $logger;
 
+	/** @var SpecialPageFactory|null */
+	private ?SpecialPageFactory $specialPageFactory;
+
+	/** @var Language|null */
+	private ?Language $contentLanguage;
+
 	/** @var string[] Normalised CrawlerProtectedActions */
 	private array $normalizedProtectedActions;
 
@@ -97,13 +105,17 @@ class CrawlerProtectionService {
 	 * @param CrawlerProtectionShouldDenyHook $hookRunner
 	 * @param bool $cliMode
 	 * @param LoggerInterface $logger
+	 * @param SpecialPageFactory|null $specialPageFactory
+	 * @param Language|null $contentLanguage
 	 */
 	public function __construct(
 		ServiceOptions $options,
 		ResponseFactory $responseFactory,
 		CrawlerProtectionShouldDenyHook $hookRunner,
 		bool $cliMode,
-		LoggerInterface $logger
+		LoggerInterface $logger,
+		?SpecialPageFactory $specialPageFactory = null,
+		?Language $contentLanguage = null
 	) {
 		$options->assertRequiredOptions( self::CONSTRUCTOR_OPTIONS );
 		$this->options = $options;
@@ -111,6 +123,8 @@ class CrawlerProtectionService {
 		$this->hookRunner = $hookRunner;
 		$this->cliMode = $cliMode;
 		$this->logger = $logger;
+		$this->specialPageFactory = $specialPageFactory;
+		$this->contentLanguage = $contentLanguage;
 
 		// Pre-normalise all array-valued configs at construction time so that a
 		// misconfigured scalar never fatals on array_map / foreach, and so that
@@ -119,7 +133,9 @@ class CrawlerProtectionService {
 		$this->normalizedProtectedApiModules = $this->normalizeArrayConfig( 'CrawlerProtectedApiModules' );
 		$this->normalizedProtectedRestPaths = $this->normalizeArrayConfig( 'CrawlerProtectedRestPaths' );
 		$this->normalizedProtectedQueryParams = $this->normalizeArrayConfig( 'CrawlerProtectedQueryParams' );
-		$this->normalizedProtectedSpecialPages = $this->normalizeArrayConfig( 'CrawlerProtectedSpecialPages' );
+		$this->normalizedProtectedSpecialPages = $this->normalizeProtectedSpecialPages(
+			$this->normalizeArrayConfig( 'CrawlerProtectedSpecialPages' )
+		);
 		$this->normalizedAllowedIPs = $this->normalizeAndValidateIPs(
 			$this->normalizeArrayConfig( 'CrawlerProtectionAllowedIPs' )
 		);
@@ -258,23 +274,32 @@ class CrawlerProtectionService {
 		$user,
 		$request
 	): bool {
+		$canonicalSpecialPageName = $this->getCanonicalSpecialPageNameFromRequest(
+			$request,
+			$specialPageName
+		);
+
 		if ( $this->cliMode ) {
 			return true;
 		}
 
 		$shouldDeny = !$this->isUserAllowed( $user )
 			&& !$this->isRequestIPAllowed( $request )
-			&& $this->isProtectedSpecialPage( $specialPageName );
+			&& $this->isProtectedSpecialPage( $canonicalSpecialPageName );
 
 		$this->hookRunner->onCrawlerProtectionShouldDeny(
 			$user,
 			$request,
 			CrawlerProtectionShouldDenyHook::ENTRY_POINT_INDEX,
-			$specialPageName,
+			$canonicalSpecialPageName,
 			$shouldDeny
 		);
 
 		if ( $shouldDeny ) {
+			$this->responseFactory->markSpecialPageAliases(
+				$request->response(),
+				$this->getSpecialPageAliasesForHeader( $canonicalSpecialPageName )
+			);
 			$this->responseFactory->denyAccess( $output );
 			return false;
 		}
@@ -456,34 +481,153 @@ class CrawlerProtectionService {
 	 * Determine whether the given special page name is in the
 	 * configured list of protected special pages.
 	 *
-	 * Because this method is only called from the SpecialPageBeforeExecute
-	 * hook, any "Foo:" prefix on a configured value is necessarily the
-	 * "Special" namespace in English or its localized equivalent (e.g.
-	 * "Spezial:" in German). We therefore simply strip everything up to
-	 * and including the first colon rather than checking for a specific
-	 * namespace name, which keeps the logic language-agnostic.
+	 * Configured values and request-derived names are normalized by stripping any
+	 * namespace-like prefix and resolving the remainder through
+	 * SpecialPageFactory when it is available, so content-language aliases match
+	 * the canonical special-page name.
 	 *
 	 * @param string $specialPageName
 	 * @return bool
 	 */
 	public function isProtectedSpecialPage( string $specialPageName ): bool {
-		// Normalize protected special pages: lowercase and strip any
-		// namespace prefix (everything up to and including the first ':').
-		$normalizedProtectedPages = array_map(
-			static function ( string $p ): string {
-				$lower = strtolower( $p );
-				$colonPos = strpos( $lower, ':' );
-				if ( $colonPos !== false ) {
-					return substr( $lower, $colonPos + 1 );
-				}
-				return $lower;
+		return in_array(
+			$this->normalizeSpecialPageName( $specialPageName ),
+			$this->normalizedProtectedSpecialPages,
+			true
+		);
+	}
+
+	/**
+	 * Canonicalize configured special-page names for stable matching.
+	 *
+	 * @param string[] $specialPages
+	 * @return string[]
+	 */
+	private function normalizeProtectedSpecialPages( array $specialPages ): array {
+		return array_values( array_unique( array_map(
+			function ( string $specialPageName ): string {
+				return $this->normalizeSpecialPageName( $specialPageName );
 			},
-			$this->normalizedProtectedSpecialPages
+			$specialPages
+		) ) );
+	}
+
+	/**
+	 * Normalize a special-page identifier for comparisons.
+	 *
+	 * Values are canonicalized through SpecialPageFactory when available so that
+	 * configured aliases in any supported language resolve to the same
+	 * canonical special-page name.
+	 *
+	 * @param string $specialPageName
+	 * @return string
+	 */
+	private function normalizeSpecialPageName( string $specialPageName ): string {
+		$unprefixedName = $this->stripSpecialPagePrefix( trim( $specialPageName ) );
+		$canonicalName = $this->resolveSpecialPageAlias( $unprefixedName );
+
+		if ( $canonicalName !== null ) {
+			return strtolower( $canonicalName );
+		}
+
+		return strtolower( str_replace( ' ', '_', $unprefixedName ) );
+	}
+
+	/**
+	 * Remove the special-page namespace prefix from a title-like string.
+	 *
+	 * @param string $specialPageName
+	 * @return string
+	 */
+	private function stripSpecialPagePrefix( string $specialPageName ): string {
+		$colonPos = strpos( $specialPageName, ':' );
+
+		if ( $colonPos === false ) {
+			return $specialPageName;
+		}
+
+		return substr( $specialPageName, $colonPos + 1 );
+	}
+
+	/**
+	 * Resolve a special-page alias to its canonical name.
+	 *
+	 * @param string $specialPageName
+	 * @return string|null
+	 */
+	private function resolveSpecialPageAlias( string $specialPageName ): ?string {
+		if ( $this->specialPageFactory === null
+			|| !method_exists( $this->specialPageFactory, 'resolveAlias' )
+		) {
+			return null;
+		}
+
+		[ $canonicalName, ] = $this->specialPageFactory->resolveAlias(
+			str_replace( ' ', '_', $specialPageName )
 		);
 
-		$name = strtolower( $specialPageName );
+		return is_string( $canonicalName ) && $canonicalName !== ''
+			? $canonicalName
+			: null;
+	}
 
-		return in_array( $name, $normalizedProtectedPages, true );
+	/**
+	 * Canonicalize the requested special page from the web request when possible.
+	 *
+	 * @param WebRequest $request
+	 * @param string $fallback
+	 * @return string
+	 */
+	private function getCanonicalSpecialPageNameFromRequest( $request, string $fallback ): string {
+		$title = $request->getVal( 'title' );
+
+		if ( !is_string( $title ) || trim( $title ) === '' ) {
+			return $fallback;
+		}
+
+		$canonicalName = $this->resolveSpecialPageAlias(
+			$this->stripSpecialPagePrefix( trim( $title ) )
+		);
+
+		return $canonicalName !== null ? $canonicalName : $fallback;
+	}
+
+	/**
+	 * Build the canonical-language aliases emitted for denied special pages.
+	 *
+	 * @param string $canonicalSpecialPageName
+	 * @return string[]
+	 */
+	private function getSpecialPageAliasesForHeader( string $canonicalSpecialPageName ): array {
+		$aliases = [ 'Special:' . $canonicalSpecialPageName ];
+
+		if ( $this->contentLanguage === null
+			|| !defined( 'NS_SPECIAL' )
+			|| !method_exists( $this->contentLanguage, 'getNsText' )
+			|| !method_exists( $this->contentLanguage, 'getSpecialPageAliases' )
+		) {
+			return $aliases;
+		}
+
+		$specialNamespace = $this->contentLanguage->getNsText( NS_SPECIAL );
+		$specialPageAliases = $this->contentLanguage->getSpecialPageAliases();
+
+		if ( !is_string( $specialNamespace ) || $specialNamespace === ''
+			|| !is_array( $specialPageAliases )
+			|| !isset( $specialPageAliases[$canonicalSpecialPageName] )
+			|| !is_array( $specialPageAliases[$canonicalSpecialPageName] )
+		) {
+			return $aliases;
+		}
+
+		foreach ( $specialPageAliases[$canonicalSpecialPageName] as $alias ) {
+			if ( !is_string( $alias ) || $alias === '' ) {
+				continue;
+			}
+			$aliases[] = $specialNamespace . ':' . $alias;
+		}
+
+		return array_values( array_unique( $aliases ) );
 	}
 
 	/**

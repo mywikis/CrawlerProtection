@@ -1,7 +1,7 @@
 {
     "name": "CrawlerProtection",
     "author": "[https://mywikis.com MyWikis LLC]",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "url": "https://www.mediawiki.org/wiki/Extension:CrawlerProtection",
     "descriptionmsg": "crawlerprotection-desc",
     "type": "hook",

@@ -149,6 +149,12 @@ namespace MediaWiki\Output {
 }
 
 namespace MediaWiki\SpecialPage {
+	class SpecialPageFactory {
+		public function resolveAlias( $alias ) {
+			return [ null, null ];
+		}
+	}
+
 	class SpecialPage {
 		public function getName() {
 			return '';
@@ -156,6 +162,18 @@ namespace MediaWiki\SpecialPage {
 
 		public function getContext() {
 			return null;
+		}
+	}
+}
+
+namespace MediaWiki\Language {
+	class Language {
+		public function getNsText( $namespace ) {
+			return '';
+		}
+
+		public function getSpecialPageAliases() {
+			return [];
 		}
 	}
 }

@@ -6,6 +6,8 @@ use MediaWiki\Config\ServiceOptions;
 use MediaWiki\Extension\CrawlerProtection\CrawlerProtectionService;
 use MediaWiki\Extension\CrawlerProtection\Hook\CrawlerProtectionShouldDenyHook;
 use MediaWiki\Extension\CrawlerProtection\ResponseFactory;
+use MediaWiki\Language\Language;
+use MediaWiki\SpecialPage\SpecialPageFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -61,6 +63,8 @@ class CrawlerProtectionServiceTest extends TestCase {
 	 * @param bool $treatTempUsersAsAnon
 	 * @param callable[] $shouldDenyHandlers Handlers for CrawlerProtectionShouldDeny
 	 * @param bool $trustXForwardedFor
+	 * @param SpecialPageFactory|null $specialPageFactory
+	 * @param Language|null $contentLanguage
 	 * @return CrawlerProtectionService
 	 */
 	private function buildService(
@@ -75,7 +79,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 		array $protectedRestPaths = [],
 		bool $treatTempUsersAsAnon = false,
 		array $shouldDenyHandlers = [],
-		bool $trustXForwardedFor = false
+		bool $trustXForwardedFor = false,
+		?SpecialPageFactory $specialPageFactory = null,
+		?Language $contentLanguage = null
 	): CrawlerProtectionService {
 		$options = new ServiceOptions(
 			CrawlerProtectionService::CONSTRUCTOR_OPTIONS,
@@ -101,7 +107,9 @@ class CrawlerProtectionServiceTest extends TestCase {
 			$responseFactory,
 			$hookRunner,
 			$cliMode,
-			new NullLogger()
+			new NullLogger(),
+			$specialPageFactory,
+			$contentLanguage
 		);
 	}
 
@@ -908,6 +916,99 @@ class CrawlerProtectionServiceTest extends TestCase {
 	public function testIsProtectedSpecialPageStripsAnyPrefix() {
 		$service = $this->buildService( [ 'Especial:WhatLinksHere' ] );
 		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+	}
+
+	/**
+	 * @covers ::isProtectedSpecialPage
+	 */
+	public function testIsProtectedSpecialPageCanonicalizesConfiguredAlias() {
+		$specialPageFactory = $this->createMock( SpecialPageFactory::class );
+		$specialPageFactory->method( 'resolveAlias' )
+			->willReturnCallback(
+				static function ( $alias ) {
+					return $alias === 'Linkliste'
+						? [ 'WhatLinksHere', null ]
+						: [ null, null ];
+				}
+			);
+
+		$service = $this->buildService(
+			[ 'Spezial:Linkliste' ],
+			[ 'history' ],
+			[],
+			null,
+			true,
+			[ 'target' ],
+			false,
+			[],
+			[],
+			false,
+			[],
+			false,
+			$specialPageFactory
+		);
+
+		$this->assertTrue( $service->isProtectedSpecialPage( 'WhatLinksHere' ) );
+	}
+
+	/**
+	 * @covers ::checkSpecialPage
+	 */
+	public function testCheckSpecialPageCanonicalizesRequestTitleAndSurfacesAliases() {
+		$output = $this->createMock( self::$outputPageClassName );
+		$user = $this->createMock( self::$userClassName );
+		$user->method( 'isRegistered' )->willReturn( false );
+
+		$response = $this->createMock( self::$webResponseClassName );
+		$request = $this->createMock( self::$webRequestClassName );
+		$request->method( 'getVal' )->willReturnMap( [
+			[ 'title', null, 'Spezial:Linkliste' ],
+		] );
+		$request->method( 'response' )->willReturn( $response );
+
+		$responseFactory = $this->createMock( ResponseFactory::class );
+		$responseFactory->expects( $this->once() )
+			->method( 'markSpecialPageAliases' )
+			->with( $response, [ 'Special:WhatLinksHere', 'Spezial:Linkliste' ] );
+		$responseFactory->expects( $this->once() )->method( 'denyAccess' )->with( $output );
+
+		$specialPageFactory = $this->createMock( SpecialPageFactory::class );
+		$specialPageFactory->method( 'resolveAlias' )
+			->willReturnCallback(
+				static function ( $alias ) {
+					return $alias === 'Linkliste'
+						? [ 'WhatLinksHere', null ]
+						: [ null, null ];
+				}
+			);
+
+		$contentLanguage = $this->createMock( Language::class );
+		$contentLanguage->method( 'getNsText' )
+			->with( NS_SPECIAL )
+			->willReturn( 'Spezial' );
+		$contentLanguage->method( 'getSpecialPageAliases' )
+			->willReturn( [
+				'WhatLinksHere' => [ 'Linkliste' ],
+			] );
+
+		$service = $this->buildService(
+			[ 'Spezial:Linkliste' ],
+			[],
+			[],
+			$responseFactory,
+			true,
+			[],
+			false,
+			[],
+			[],
+			false,
+			[],
+			false,
+			$specialPageFactory,
+			$contentLanguage
+		);
+
+		$this->assertFalse( $service->checkSpecialPage( 'WhatLinksHere', $output, $user, $request ) );
 	}
 
 	/**

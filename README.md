@@ -25,6 +25,8 @@ addresses in `$wgCrawlerProtectionAllowedIPs` are always permitted.
 * `$wgCrawlerProtectedSpecialPages` - array of special pages to protect
   (default: `[ 'mobilediff', 'recentchangeslinked', 'whatlinkshere' ]`).
   Supported values are special page names or their aliases regardless of case.
+  Aliases are canonicalized through MediaWiki's special-page alias resolver, so
+  values like `Spezial:Linkliste` still match the canonical `WhatLinksHere`.
   You do not need to use the 'Special:' prefix. Note that you can fetch a full
   list of SpecialPages defined by your wiki using the API and jq with a simple
   bash one-liner like
@@ -114,6 +116,12 @@ repeats the same robot policy as a `<meta>` tag, so that well-behaved crawlers
 stop re-requesting denied URLs. Denied Action API requests are answered with
 HTTP 403, as are denied REST API requests.
 
+Denied special-page responses also carry an
+`X-CrawlerProtection-Special-Page-Aliases` header listing the canonical
+`Special:` title together with the content-language aliases MediaWiki knows for
+that page. Reverse proxies can use that header to discover additional special
+page URL patterns to block before they reach PHP.
+
 ## Wikis behind a reverse proxy
 
 When the wiki sits behind a reverse proxy such as HAProxy, nginx or Varnish,
@@ -199,4 +207,3 @@ $wgHooks['CrawlerProtectionShouldDeny'][] = static function (
 	}
 };
 ```
-
